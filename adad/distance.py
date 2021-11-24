@@ -59,6 +59,7 @@ class DAIndexGamma(AppDomainBase):
         dist_sorted = np.sort(dist_mean)
         idx = int(np.floor(self.ci * n))
         self.threshold = dist_sorted[idx]
+        return self
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
@@ -68,64 +69,3 @@ class DAIndexGamma(AppDomainBase):
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
         return results
-
-    def predict(self, X):
-        """Apply Applicability Domain and then perform classification on X using
-        the given classifier.
-
-        Returns
-        -------
-        pred: 1-D array
-            The predictions of the samples that are passed AD test.
-        idx: 1-D array
-            The indices that are passed the AD test.
-        """
-        if self.clf == None or not hasattr(self.clf, 'predict'):
-            raise RuntimeError(
-                'This method is not supported.')
-        if self.tree == None:
-            raise RuntimeError(
-                "Model hasn't trained. Call 'fit(X)' method first!")
-
-        ad_measure = self.measure(X)
-        idx = np.where(ad_measure)[0]
-        pred = self.clf.predict(X[idx])
-        return pred, idx
-
-    def predict_proba(self, X):
-        """Apply Applicability Domain and then compute probabilities of possible
-        outcomes for X using the given classifier.
-
-        Returns
-        -------
-        pred: 1-D array
-            The predictions of the samples that are passed AD test.
-        idx: 1-D array
-            The indices that are passed the AD test.
-        """
-        if self.clf == None or not hasattr(self.clf, 'predict_proba'):
-            raise RuntimeError(
-                'This method is not supported.')
-        if self.tree == None:
-            raise RuntimeError(
-                "Model hasn't trained. Call 'fit(X)' method first!")
-
-        ad_measure = self.measure(X)
-        idx = np.where(ad_measure)[0]
-        pred = self.clf.predict_proba(X[idx])
-        return pred, idx
-
-    def score(self, X, y):
-        """Apply Applicability Domain and return the accuracy on the subset data
-        and labels. 
-        """
-        if self.clf == None or not hasattr(self.clf, 'predict'):
-            raise RuntimeError(
-                'This method is not supported.')
-        if self.tree == None:
-            raise RuntimeError(
-                "Model hasn't trained. Call 'fit(X)' method first!")
-
-        pred, idx = self.predict(X)
-        acc = np.mean(pred == y[idx])
-        return acc
