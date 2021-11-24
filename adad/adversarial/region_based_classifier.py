@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from adad.app_domain_base import AppDomainBase
+from adad import AppDomainBase
 
 logger = logging.getLogger(__name__)
 
