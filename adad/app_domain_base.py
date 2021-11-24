@@ -8,7 +8,7 @@ import numpy as np
 
 class AppDomainBase(ABC):
     @abstractmethod
-    def fit(self):
+    def fit(self, X, y):
         raise NotImplementedError
 
     @abstractmethod

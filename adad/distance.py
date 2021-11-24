@@ -51,7 +51,7 @@ class DAIndexGamma(AppDomainBase):
         self.tree = None
         self.threshold = np.inf
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
