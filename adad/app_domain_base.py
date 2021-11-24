@@ -1,3 +1,5 @@
+"""Base class for Applicability Domain classifier.
+"""
 from abc import ABC, abstractmethod
 import pickle
 
@@ -13,11 +15,11 @@ class AppDomainBase(ABC):
 
     @abstractmethod
     def predict(self, X):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def score(self, X, y):
-        raise NotImplementedError
+        pass
 
     def save(self, path):
         with open(path, 'wb') as file:

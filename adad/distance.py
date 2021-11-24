@@ -1,3 +1,5 @@
+"""Average Distance-based Applicability Domain (DA-Index Gamma)
+"""
 import logging
 
 import numpy as np
