@@ -148,7 +148,6 @@ cython_debug/
 log/
 # results/
 test.*
-.vscode/settings.json
 
 # R workspace files
 .RData
