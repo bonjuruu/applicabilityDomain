@@ -117,12 +117,7 @@ class DAIndexGamma(AppDomainBase):
 
     def score(self, X, y):
         """Apply Applicability Domain and return the accuracy on the subset data
-        and labels.
-
-        Returns
-        -------
-        score: float
-            Mean accuracy of the subset data that have passed AD test.
+        and labels. 
         """
         if self.clf == None or not hasattr(self.clf, 'predict'):
             raise RuntimeError(
