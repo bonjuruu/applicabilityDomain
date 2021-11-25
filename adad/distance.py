@@ -68,4 +68,6 @@ class DAIndexGamma(AppDomainBase):
         measure = dist_mean / self.threshold
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
+        # TODO: We might need consider to return `measure`(float) instead of 
+        # binary values.
         return results
