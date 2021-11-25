@@ -24,15 +24,18 @@ def generate_random_samples(x, x_min, x_max, r, size):
 
 
 def generate_random_int_samples(x, x_min, x_max, r, size):
-    """Generate random samples around discrete sample x, bounded by Manhattan
+    """Generate random samples around integer value x, bounded by Manhattan
     distance [-1, 1].
     """
     dtype = x.dtype
     n_features = len(x)
-    shape = (size, int(np.floor(r * n_features)))
+    n_flip = int(np.floor(r * n_features))
+    shape = (size, n_flip)
     # Find the indices want to add noise (5% of 100 attributes mean we choose 5 indices)
-    indices = np.random.choice(
-        np.arange(n_features), size=shape, replace=False)
+    indices = np.zeros(shape, dtype=int)
+    for i in range(size):
+        indices[i] = np.random.choice(
+            np.arange(n_features), size=n_flip, replace=False)
     # Generate a list of {-1, 1} with same length of the indices to represent noise
     noise = np.random.randint(0, 2, size=shape).astype(dtype)
     noise[noise == 0] = -1
@@ -61,7 +64,9 @@ class SklearnRegionBasedClassifier(AppDomainBase):
         Default value is NOT suitable for discrete data.
     x_max: float or array, default=1.0
         Default value is NOT suitable for discrete data.
-    max_r: float, optional, default=0.2
+    r_min: float, optional, default=0.0
+        Minimum searching radius.
+    r_max: float, optional, default=0.2
         Maximum searching radius. (Use 0.4 for continuous data)
     step_size:float, default=1
         Step size for each iteration. Default value is NOT suitable for continuous
@@ -69,21 +74,36 @@ class SklearnRegionBasedClassifier(AppDomainBase):
     eps: float, default=0.01
         The tolerance parameter for searching radius.
     data_type: {'continue', 'discrete'}, default='discrete'
+    ci: float, default=0.9
+        Confidence interval for regiona-based classifier. It should in-between (0, 1].
     verbose: int, default=0
         Report information if verbose is greater than 0.
     """
 
-    def __init__(self, clf, sample_size=1000, x_min=0.0, x_max=1.0, max_r=0.2,
-                 step_size=1, eps=0.99, data_type='discrete', verbose=0):
+    def __init__(self, clf, sample_size=1000, x_min=0.0, x_max=1.0,
+                 r_min=0., r_max=0.2, step_size=1, eps=0.01,
+                 data_type='discrete', ci=0.9, verbose=0):
         self.clf = clf
         self.sample_size = sample_size
         self.x_min = x_min
         self.x_max = x_max
-        self.max_r = max_r
+        self.r_min = r_min
+        self.r_max = r_max
         self.step_size = step_size
         self.eps = eps
         self.data_type = data_type
+        self.ci = ci
         self.verbose = verbose
+
+        if self.verbose > 0:
+            logging.basicConfig(
+                format='[%(name)s]:%(message)s', level=logging.INFO)
+
+        if r_min >= r_max:
+            raise ValueError('Invalid initial r value!')
+        if not data_type in ['discrete', 'continue']:
+            raise ValueError(
+                'data_type can only be either discrete or continue!')
 
         if data_type == 'discrete':
             self.rng_sample_generator = generate_random_int_samples
@@ -91,14 +111,17 @@ class SklearnRegionBasedClassifier(AppDomainBase):
             self.rng_sample_generator = generate_random_samples
 
         # Initial radius without training
-        self.r = max_r
+        self.r = r_max
+        self.n_class = 0
 
     def fit(self, X, y):
         """Search the threshold using given training data"""
         time_start = time.perf_counter()
+
         acc_pt = self.clf.score(X, y)
-        if self.verbose > 0:
-            logger.info(f'Point-based accuracy: {acc_pt * 100:.2f}%.')
+        logger.info(f'Point-based accuracy: {acc_pt * 100:.2f}%.')
+        self.n_class = len(np.unique(y))
+        logger.info(f'n_class: {self.n_class}')
 
         if self.data_type == 'discrete':
             n_features = X.shape[1]
@@ -107,10 +130,12 @@ class SklearnRegionBasedClassifier(AppDomainBase):
             min_step = self.step_size
 
         # Apply Binary search to find r value.
-        r_low = 0.
-        r_high = self.max_r
+        r_low = self.r_min
+        r_high = self.r_max
         while r_low < r_high:
             r_mid = (r_high + r_low) / 2.
+            logger.info('Search Low: {:.4f} Mid: {:.4f} High: {:.4f}'.format(
+                r_low, r_mid, r_high))
             acc_mid = self.score_region(X, y, r_mid)
             # If x is greater, ignore left half
             if acc_mid + self.eps > acc_pt:
@@ -119,56 +144,57 @@ class SklearnRegionBasedClassifier(AppDomainBase):
             elif acc_mid - self.eps < acc_pt:
                 r_high = r_mid - min_step
             else:
-                r_best = r_mid
                 break
 
-        if self.verbose > 0:
-            time_elapsed = time.perf_counter() - time_start
-            logger.info(f'Total training time: {time2str(time_elapsed)}')
+        time_elapsed = time.perf_counter() - time_start
+        logger.info(f'Total training time: {time2str(time_elapsed)}')
 
-        self.r = r_best
+        self.r = r_mid
+        logger.info(f'Best r: {r_mid:.4f}')
         return self
 
     def measure(self, X):
         """Check AD on X. Smaller value indicates it within the domain."""
-        pred_pt = self.clf.predict(X)
-        results = np.zeros_like(pred_pt, dtype=float)
+        pred_pt = self.clf.predict(X).astype(int)
+        measure = np.zeros_like(pred_pt, dtype=float)
 
         n = X.shape[0]
         # Region-based prediction is performed 1-by-1.
         pbar = tqdm(range(n), ncols=100) if self.verbose else range(n)
         for i in pbar:
-            x_rng = self.rng_sample_generator(
-                X[i], x_min=self.x_min, x_max=self.x_max,
-                r=self.r, size=self.sample_size)
-            pred_rng = self.model.predict(x_rng)
-            bincount = np.bincount(pred_rng)  # Build a histogram
+            bincount = self.__get_bin(X[i], r=self.r)
             # Record how many random samples match the point-based prediction.
-            results[i] = bincount[pred_pt]
+            measure[i] = bincount[pred_pt[i]]
 
         # Since 0 means perfectly within the domain, so invert the value.
-        results = (self.sample_size - results) / self.sample_size
+        measure = measure / self.sample_size
+        results = measure >= self.ci
         return results
 
     def predict_region(self, X, r=None):
         """Predict class labels using Region-based classifier."""
         if r is None:
             r = self.r
-        pred_region = -np.ones(len(X), dtype=float)
+        pred_region = -np.ones(len(X), dtype=int)
 
         n = X.shape[0]
         # Region-based prediction is performed 1-by-1.
         pbar = tqdm(range(n), ncols=100) if self.verbose else range(n)
         for i in pbar:
-            x_rng = self.rng_sample_generator(
-                X[i], x_min=self.x_min, x_max=self.x_max,
-                r=r, size=self.sample_size)
-            pred_rng = self.model.predict(x_rng)
-            # Build a histogram
-            pred_region[i] = np.bincount(pred_rng).argmax()
+            bincount = self.__get_bin(X[i], r=r)
+            pred_region[i] = bincount.argmax()
         return pred_region
 
     def score_region(self, X, y, r=None):
         """Compute accuracy using Regin-based classifier."""
         pred = self.predict_region(X, r)
         return np.mean(pred == y)
+
+    def __get_bin(self, x, r):
+        x_rng = self.rng_sample_generator(
+            x, x_min=self.x_min, x_max=self.x_max,
+            r=r, size=self.sample_size)
+        pred_rng = self.clf.predict(x_rng).astype(int)
+        # Build a histogram
+        bincount = np.bincount(pred_rng, minlength=self.n_class).astype(int)
+        return bincount

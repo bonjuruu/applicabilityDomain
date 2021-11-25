@@ -22,6 +22,13 @@ def category2code(df):
     return result
 
 
+def drop_redundant_col(df):
+    """Drop columns that use same value for all samples."""
+    df_filtered = df.copy()
+    df_filtered = df_filtered.iloc[:, np.where(df_filtered.nunique() > 1)[0]]
+    return df_filtered
+
+
 def get_range(X):
     """Return a tuple of minimal and maximum values"""
     if isinstance(X, pd.DataFrame):
