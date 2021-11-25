@@ -44,8 +44,9 @@ def generate_random_int_samples(x, x_min, x_max, r, size):
     # Added noise to the sample
     for i_sample, i_feature in enumerate(indices):
         rng_samples[i_sample, i_feature] += noise[i_sample]
+    # We cant the random sample <= than the radius not always = the radius
     # To handle the situation where the majority of a sparse matrix only contain 0.
-    rng_samples[rng_samples < 0] = 1
+    # rng_samples[rng_samples < 0] = 1
     # Ensure the random samples are valid.
     rng_samples = np.clip(rng_samples, a_min=x_min, a_max=x_max)
     return rng_samples
@@ -166,7 +167,7 @@ class SklearnRegionBasedClassifier(AppDomainBase):
             # Record how many random samples match the point-based prediction.
             measure[i] = bincount[pred_pt[i]]
 
-        # Since 0 means perfectly within the domain, so invert the value.
+        # TODO: measure function should produce continuous value instead of boolean
         measure = measure / self.sample_size
         results = measure >= self.ci
         return results
