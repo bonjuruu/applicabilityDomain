@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import pytest
+from numpy.random import randint
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -9,15 +10,10 @@ from sklearn.model_selection import train_test_split
 from adad.distance import DAIndexGamma
 
 SEED = 348
+np.random.seed(348)
 
-files_path = os.path.join(os.getcwd(), 'data', 'maccs')
-dataset_files = [os.path.join(files_path, file) for file in os.listdir(files_path)]
-file_datapath = dataset_files[3]
-
-df = pd.read_csv(file_datapath)
-
-X = df.iloc[:, :-1].values
-y = df.iloc[:, -1].values
+X = randint(5, size=(20, 5))
+y = np.array([0,0,1,1,0,1,0,1,0,1,0,0,1,1,0,1,0,1,0,1])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED)
 
@@ -40,15 +36,13 @@ def test_Gamma_fit():
     dist_sorted = np.sort(dist_mean)
     idx = int(np.floor(ad.ci * len(X_train)))
     
-    assert ad.threshold < dist_sorted[len(X_train)- 1] and ad.threshold > dist_sorted[idx - 1]
+    assert ad.threshold <= dist_sorted[len(X_train)- 1] and ad.threshold >= dist_sorted[idx - 1]
     
 def test_Gamma_measure():
     ad = DAIndexGamma(clf=classifier)
     ad.fit(X_train)
     results = ad.measure(X_train)
-    print(type(results[0]))
     
-    assert all(results) == False
     assert all([type(x) == np.bool_ for x in results])
     
     results2 = ad.measure(X_test)
@@ -62,8 +56,8 @@ def test_Gamma_predict():
     predict, indexs = ad.predict(X_test)
     p_size, i_size = len(predict), len(indexs)
     
-    assert i_size > 0 and i_size < len(X_test)
-    assert p_size > 0 and p_size < len(X_test)
+    assert i_size > 0 and i_size <= len(X_test)
+    assert p_size > 0 and p_size <= len(X_test)
     assert i_size == p_size
     
     
@@ -73,8 +67,8 @@ def test_Gamma_predict_proba():
     predict, indexs = ad.predict_proba(X_test)
     p_size, i_size = len(predict), len(indexs)
     
-    assert i_size > 0 and i_size < len(X_test)
-    assert p_size > 0 and p_size < len(X_test)
+    assert i_size > 0 and i_size <= len(X_test)
+    assert p_size > 0 and p_size <= len(X_test)
     assert i_size == p_size
     
 def test_Gamma_score():
@@ -82,7 +76,7 @@ def test_Gamma_score():
     ad.fit(X_train)
     score = ad.score(X_test, y_test)
     
-    assert score > 0.5
+    assert score >= 0 and score <= 1
     
 def test_ad_save():
     path = os.path.join(os.getcwd(), "tests//save_files") 
