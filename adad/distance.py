@@ -146,6 +146,7 @@ class DAIndexDelta(AppDomainBase):
         self.threshold = np.inf
 
     def fit(self, X, y=None):
+        self.X = X
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, idx = self.tree.query(X, k=self.k + 1)

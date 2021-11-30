@@ -1,10 +1,11 @@
 import os
+from matplotlib import pyplot as plt
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from adad.evaluate import sensitivity_specificity, save_roc
+from adad.evaluate import sensitivity_specificity, save_roc, calculate_auc, acc_vs_removed, get_fpr_tpr
 from adad.distance import DAIndexGamma
 
 
@@ -57,6 +58,9 @@ def run_dist():
     path_roc = os.path.join(os.getcwd(), 'results', 'ames_roc.pdf')
     save_roc(y_test[idx], proba, path_roc, title='Ames ROC Curve')
 
+    y_true = y_test[idx]
+    sig_value, perm_AUC = calculate_auc(y_true, pred, proba, 1000, SEED)
+    print(f"Significance value: {sig_value}")
 
 if __name__ == '__main__':
     run_dist()

@@ -34,3 +34,10 @@ def get_range(X):
     if isinstance(X, pd.DataFrame):
         return (X.min(axis=0).to_numpy(), X.max(axis=0).to_numpy())
     return X.min(axis=0), X.max(axis=0)
+
+#for multilabel
+def hamming_accuracy(y_true, y_pred):
+    non_nans = np.count_nonzero(~np.isnan(y_true))
+    if non_nans == 0:
+        return 1
+    return np.sum(y_true==y_pred) / non_nans
