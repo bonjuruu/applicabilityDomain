@@ -3,6 +3,8 @@ from numpy.core.fromnumeric import argmax
 
 from .app_domain_base import AppDomainBase
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 
 class probability_RFC(AppDomainBase):
     def __init__(self, clf, ci=0.95):
@@ -87,4 +89,59 @@ class probability_RFC(AppDomainBase):
         measure = all_error_prob / self.threshold
         results = measure <= 1
         return results
+    
+class probability_kNN(AppDomainBase):
+    def __init__(self, clf, k, ci=0.95):
+        super(probability_kNN, self).__init__()
+        
+        self.clf = clf
+        assert isinstance(clf, KNeighborsClassifier)
+
+        self.k = k
+        self.ci = ci
+        
+    def fit(self, X, y=0):
+        self.X = X
+        k_neighbours = self.clf.kneighbors(X, return_distance=False)
+        all_p_error = []
+        
+        for i in range(len(X)):
+            c_pred = self.clf.predict(X[k_neighbours[i]])[1:]
+            p1_kNN = 1 / self.k * np.sum(c_pred == 0)
+            p2_kNN = 1 / self.k * np.sum(c_pred == 1)
+            
+            all_p_error.append(1 - max(p1_kNN, p2_kNN))
+        
+        all_p_error_sorted = np.sort(all_p_error)
+        idx = int(np.floor(self.ci * len(X)))
+        self.threshold = all_p_error_sorted[idx]
+        return self
+        
+    
+    def measure(self, X):
+        k_neighbours = self.clf.kneighbors(X, return_distance=False)
+        all_p_error = []
+        
+        for i in range(len(X)):
+            c_pred = self.clf.predict(self.X[k_neighbours[i]])[1:]
+            p1_kNN = 1 / self.k * np.sum(c_pred == 0)
+            p2_kNN = 1 / self.k * np.sum(c_pred == 1)
+            
+            all_p_error.append(1 - max(p1_kNN, p2_kNN))
+        
+        measure = all_p_error / self.threshold
+        results = measure <= 1
+        return results
+            
+    
+class probability_SVM(AppDomainBase):
+    def __init__(self, clf, ci=0.95):
+        super(probability_SVM, self).__init__()
+
+        self.clf = clf
+        assert isinstance(clf, SVC)
+        self.no_trees = len(self.clf.estimators_)
+        
+        self.ci = ci
+    
     
