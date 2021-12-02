@@ -153,8 +153,7 @@ class DAIndexDelta(AppDomainBase):
         self.tree = BallTree(X, metric=self.dist_metric)
         _, indices = self.tree.query(X, k=self.k + 1)
         dist = np.array([np.linalg.norm(
-            np.sum(self.X[indices[i, 1:]] - self.X[i], axis=0), ord=2) for i in range(n)])
-        dist = dist / self.k
+            np.mean(self.X[indices[i, 1:]] - self.X[i], axis=0), ord=2) for i in range(n)])
         dist_sorted = np.sort(dist)
         idx = int(np.floor(self.ci * n))
         self.threshold = dist_sorted[idx]
@@ -165,8 +164,7 @@ class DAIndexDelta(AppDomainBase):
         _, indices = self.tree.query(X, k=self.k)
         n = len(X)
         dist = np.array([np.linalg.norm(
-            np.sum(self.X[indices[i]] - X[i], axis=0), ord=2) for i in range(n)])
-        dist = dist / self.k
+            np.mean(self.X[indices[i]] - X[i], axis=0), ord=2) for i in range(n)])
         measure = dist / self.threshold
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
