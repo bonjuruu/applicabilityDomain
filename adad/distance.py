@@ -63,17 +63,18 @@ class DAIndexGamma(AppDomainBase):
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
-        dist, _ = self.tree.query(X, k=self.k + 1)
+        dist, _ = self.tree.query(X, k=self.k)
         dist_mean = np.sum(dist, axis=1) / self.k
         measure = dist_mean / self.threshold
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of 
+        # TODO: We might need consider to return `measure`(float) instead of
         # binary values.
         return results
-    
+
+
 class DAIndexKappa(AppDomainBase):
-    """Distance based Applicability Domain (DA-Index Kappa)
+    """Kth Nearest Distance based Applicability Domain (DA-Index Kappa)
 
     Parameters
     ----------
@@ -110,15 +111,16 @@ class DAIndexKappa(AppDomainBase):
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
-        dist, _ = self.tree.query(X, k=self.k + 1)
+        dist, _ = self.tree.query(X, k=self.k)
         dist = dist[:, -1]
-        measure = dist/ self.threshold
+        measure = dist / self.threshold
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of 
+        # TODO: We might need consider to return `measure`(float) instead of
         # binary values.
         return results
-    
+
+
 class DAIndexDelta(AppDomainBase):
     """Length of mean vector based Applicability Domain (DA-Index Delta)
 
@@ -146,11 +148,13 @@ class DAIndexDelta(AppDomainBase):
         self.threshold = np.inf
 
     def fit(self, X, y=None):
-        self.X = X
+        self.X = np.copy(X)
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
-        dist, idx = self.tree.query(X, k=self.k + 1)
-        dist = [np.linalg.norm(np.sum(self.X[idx[i]], axis=0), 2) for i in range(len(idx))]
+        _, indices = self.tree.query(X, k=self.k + 1)
+        dist = np.array([np.linalg.norm(
+            np.sum(self.X[indices[i, 1:]] - self.X[i], axis=0), ord=2) for i in range(n)])
+        dist = dist / self.k
         dist_sorted = np.sort(dist)
         idx = int(np.floor(self.ci * n))
         self.threshold = dist_sorted[idx]
@@ -158,11 +162,14 @@ class DAIndexDelta(AppDomainBase):
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
-        dist, idx = self.tree.query(X, k=self.k + 1)
-        dist = [np.linalg.norm(np.sum(self.X[idx[i]], axis=0), 2) for i in range(len(idx))]
-        measure = dist/ self.threshold
+        _, indices = self.tree.query(X, k=self.k)
+        n = len(X)
+        dist = np.array([np.linalg.norm(
+            np.sum(self.X[indices[i]] - X[i], axis=0), ord=2) for i in range(n)])
+        dist = dist / self.k
+        measure = dist / self.threshold
         # Less than 1 indicates the sample within the domain.
         results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of 
+        # TODO: We might need consider to return `measure`(float) instead of
         # binary values.
         return results
