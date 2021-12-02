@@ -153,4 +153,6 @@ test.*
 .RData
 .Rhistory
 
-# Generated files and raw data
+# Do not save test results
+tests/results/
+tests/save_files/
