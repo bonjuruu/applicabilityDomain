@@ -35,9 +35,15 @@ def get_range(X):
         return (X.min(axis=0).to_numpy(), X.max(axis=0).to_numpy())
     return X.min(axis=0), X.max(axis=0)
 
-#for multilabel
+
 def hamming_accuracy(y_true, y_pred):
+    """Compute the average Hamming loss for multilabels.
+    TODO: This is an existing method from sklearn.metrics.hamming_loss
+    TODO: The code failed test with DeprecationWarning
+    TODO: Why y_true can be NAN?
+    TODO: This method should be in "evaluation.py"
+    """
     non_nans = np.count_nonzero(~np.isnan(y_true))
     if non_nans == 0:
         return 1
-    return np.sum(y_true==y_pred) / non_nans
+    return np.sum(y_true == y_pred) / non_nans
