@@ -6,9 +6,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 
-class probability_RFC(AppDomainBase):
+class ProbabilityRFC(AppDomainBase):
     def __init__(self, clf, ci=0.95):
-        super(probability_RFC, self).__init__()
+        super(ProbabilityRFC, self).__init__()
         
         self.clf = clf
         assert isinstance(clf, RandomForestClassifier)
@@ -90,9 +90,9 @@ class probability_RFC(AppDomainBase):
         results = measure <= 1
         return results
     
-class probability_kNN(AppDomainBase):
+class ProbabilityKNN(AppDomainBase):
     def __init__(self, clf, k, ci=0.95):
-        super(probability_kNN, self).__init__()
+        super(ProbabilityKNN, self).__init__()
         
         self.clf = clf
         assert isinstance(clf, KNeighborsClassifier)
@@ -134,9 +134,9 @@ class probability_kNN(AppDomainBase):
         return results
             
     
-class probability_SVM(AppDomainBase):
+class ProbabilitySVM(AppDomainBase):
     def __init__(self, clf, ci=0.95):
-        super(probability_SVM, self).__init__()
+        super(ProbabilitySVM, self).__init__()
 
         self.clf = clf
         assert isinstance(clf, SVC)
