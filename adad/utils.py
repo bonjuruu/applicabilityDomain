@@ -1,8 +1,11 @@
 import time
+import logging
 
 import numpy as np
 import pandas as pd
 from pandas.api.types import CategoricalDtype
+
+logger = logging.getLogger(__name__)
 
 
 def time2str(time_elapsed, formatstr='%Hh%Mm%Ss'):
@@ -36,14 +39,15 @@ def get_range(X):
     return X.min(axis=0), X.max(axis=0)
 
 
-def hamming_accuracy(y_true, y_pred):
-    """Compute the average Hamming loss for multilabels.
-    TODO: This is an existing method from sklearn.metrics.hamming_loss
-    TODO: The code failed test with DeprecationWarning
-    TODO: Why y_true can be NAN?
-    TODO: This method should be in "evaluation.py"
-    """
-    non_nans = np.count_nonzero(~np.isnan(y_true))
-    if non_nans == 0:
-        return 1
-    return np.sum(y_true == y_pred) / non_nans
+def maccs2binary(data, dtype=float):
+    """Convert MACCS into binary data"""
+    try:
+        if not isinstance(data, np.ndarray):
+            raise ValueError
+        data = np.copy(data)
+        data[data >= 1] = 1
+        data[data < 1] = 0
+        data = data.astype(dtype)
+        return data
+    except ValueError:
+        logger.error(f'Expecting data to be a numpy.ndarray. Got {type(data)}')
