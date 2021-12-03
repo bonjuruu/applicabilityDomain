@@ -1,5 +1,6 @@
-import time
 import logging
+import random
+import time
 
 import numpy as np
 import pandas as pd
@@ -51,3 +52,17 @@ def maccs2binary(data, dtype=float):
         return data
     except ValueError:
         logger.error(f'Expecting data to be a numpy.ndarray. Got {type(data)}')
+
+
+def set_seed(random_state=None):
+    """Reset RNG seed."""
+    if random_state is None:
+        random_state = random.randint(1, 999999)
+    random_state = int(random_state)
+    random.seed(random_state)
+    np.random.seed(random_state)
+    # torch.manual_seed(random_state)
+    # torch.cuda.manual_seed_all(random_state)
+    # torch.backends.cudnn.deterministic = True
+    logger.info(f'Set random state to: {random_state}')
+    return random_state
