@@ -83,7 +83,7 @@ class SklearnRegionBasedClassifier(AppDomainBase):
 
     def __init__(self, clf, sample_size=1000, x_min=0.0, x_max=1.0,
                  r_min=0., r_max=0.2, step_size=1, eps=0.01,
-                 data_type='discrete', ci=0.9, verbose=0):
+                 data_type='discrete', verbose=0):
         self.clf = clf
         self.sample_size = sample_size
         self.x_min = x_min
@@ -93,7 +93,6 @@ class SklearnRegionBasedClassifier(AppDomainBase):
         self.step_size = step_size
         self.eps = eps
         self.data_type = data_type
-        self.ci = ci
         self.verbose = verbose
 
         if self.verbose > 0:
@@ -167,9 +166,7 @@ class SklearnRegionBasedClassifier(AppDomainBase):
             # Record how many random samples match the point-based prediction.
             measure[i] = bincount[pred_pt[i]]
 
-        # TODO: measure function should produce continuous value instead of boolean
-        measure = measure / self.sample_size
-        results = measure >= self.ci
+        results = measure / self.sample_size
         return results
 
     def predict_region(self, X, r=None):

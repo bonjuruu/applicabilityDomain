@@ -39,38 +39,29 @@ class DAIndexGamma(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, ci=0.95, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexGamma, self).__init__()
 
         self.clf = clf
         self.k = k
-        self.ci = ci
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
 
         self.tree = None
-        self.threshold = np.inf
+        self.dist_measure_train = None
 
-    def fit(self, X, y=None):
-        n = len(X)
+    def fit(self, X):
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
-        dist_mean = np.sum(dist, axis=1) / self.k
-        dist_sorted = np.sort(dist_mean)
-        idx = int(np.floor(self.ci * n))
-        self.threshold = dist_sorted[idx]
+        dist_mean = np.mean(dist[:, 1:], axis=1)
+        self.dist_measure_train = np.sort(dist_mean)
         return self
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
         dist, _ = self.tree.query(X, k=self.k)
-        dist_mean = np.sum(dist, axis=1) / self.k
-        measure = dist_mean / self.threshold
-        # Less than 1 indicates the sample within the domain.
-        results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of
-        # binary values.
-        return results
+        dist_measure = np.mean(dist, axis=1)
+        return dist_measure
 
 
 class DAIndexKappa(AppDomainBase):
@@ -87,38 +78,31 @@ class DAIndexKappa(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, ci=0.95, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexKappa, self).__init__()
 
         self.clf = clf
         self.k = k
-        self.ci = ci
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
 
         self.tree = None
-        self.threshold = np.inf
+        self.dist_measure_train = None
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
-        dist = dist[:, -1]
-        dist_sorted = np.sort(dist)
-        idx = int(np.floor(self.ci * n))
-        self.threshold = dist_sorted[idx]
+        dist_at_k = dist[:, -1]
+        dist_sorted = np.sort(dist_at_k)
+        self.dist_measure_train = dist_sorted
         return self
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
         dist, _ = self.tree.query(X, k=self.k)
-        dist = dist[:, -1]
-        measure = dist / self.threshold
-        # Less than 1 indicates the sample within the domain.
-        results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of
-        # binary values.
-        return results
+        dist_at_k = dist[:, -1]
+        return dist_at_k
 
 
 class DAIndexDelta(AppDomainBase):
@@ -135,39 +119,31 @@ class DAIndexDelta(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, ci=0.95, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexDelta, self).__init__()
 
         self.clf = clf
         self.k = k
-        self.ci = ci
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
 
         self.tree = None
-        self.threshold = np.inf
+        self.dist_measure_train = None
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         self.X = np.copy(X)
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
         _, indices = self.tree.query(X, k=self.k + 1)
-        dist = np.array([np.linalg.norm(
+        dist_norm = np.array([np.linalg.norm(
             np.mean(self.X[indices[i, 1:]] - self.X[i], axis=0), ord=2) for i in range(n)])
-        dist_sorted = np.sort(dist)
-        idx = int(np.floor(self.ci * n))
-        self.threshold = dist_sorted[idx]
+        self.dist_measure_train = np.sort(dist_norm)
         return self
 
     def measure(self, X):
         """Check AD on X. Returns True if a sample is within the domain."""
         _, indices = self.tree.query(X, k=self.k)
         n = len(X)
-        dist = np.array([np.linalg.norm(
+        dist_norm = np.array([np.linalg.norm(
             np.mean(self.X[indices[i]] - X[i], axis=0), ord=2) for i in range(n)])
-        measure = dist / self.threshold
-        # Less than 1 indicates the sample within the domain.
-        results = measure <= 1
-        # TODO: We might need consider to return `measure`(float) instead of
-        # binary values.
-        return results
+        return dist_norm

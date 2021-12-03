@@ -1,15 +1,17 @@
-import os, sys
-sys.path.insert(0, os.getcwd()) 
+import os
+import sys
 
+sys.path.insert(0, os.getcwd())
+
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from adad.evaluate import sensitivity_specificity, save_roc, calculate_auc
-from adad.distance import DAIndexGamma, DAIndexKappa, DAIndexDelta
-
+from adad.distance import DAIndexDelta, DAIndexGamma, DAIndexKappa
 
 SEED = 1234
+N_TREE = 100
 
 
 def run_dist():
@@ -20,19 +22,16 @@ def run_dist():
     print(f'Read from: {data_path}')
 
     df = pd.read_csv(data_path)
-    print(df.head())
-
     y = df['y'].to_numpy()
     X = df.drop(['y'], axis=1).to_numpy()
-
-    print(X.shape, y.shape)
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=SEED
     )
-    print(X_train.shape, X_test.shape)
+    print('Train shape: ', X_train.shape)
+    print(' Test shape: ', X_test.shape)
 
-    model = RandomForestClassifier(n_estimators=200)
+    model = RandomForestClassifier(n_estimators=N_TREE)
     model.fit(X_train, y_train)
 
     for AD in [DAIndexGamma, DAIndexKappa, DAIndexDelta]:
@@ -40,29 +39,17 @@ def run_dist():
         ad = AD(model)
         ad.fit(X_train)
 
-        pred, idx = ad.predict(X_test)
-        print(f'Pass rate: {len(idx) /len(X_test) * 100:.2f}%')
+        score = model.score(X_train, y_train)
+        print(f'Train score: {score * 100:.2f}%')
 
-        score = model.score(X_train, y_train) * 100
-        print(f'Train score: {score:.2f}%')
+        score = model.score(X_test, y_test)
+        print(f'[Without AD] Score: {score * 100:.2f}%')
 
-        score = model.score(X_test, y_test) * 100
-        print(f'[Without AD] Score: {score:.2f}%')
+        avg_dist_train = np.mean(ad.dist_measure_train)
+        print(f'Avg train dist: {avg_dist_train:.3f}')
 
-        score = ad.score(X_test, y_test) * 100
-        print(f'[With AD] Score: {score:.2f}%')
-
-        sensitivity, specificity = sensitivity_specificity(y_test[idx], pred)
-        print(f'Sensitivity: {sensitivity:.3f}')
-        print(f'Specificity: {specificity:.3f}')
-
-        proba, idx = ad.predict_proba(X_test)
-        path_roc = os.path.join(os.getcwd(), 'results', 'ames_roc.pdf')
-        save_roc(y_test[idx], proba, path_roc, title='Ames ROC Curve')
-
-        y_true = y_test[idx]
-        sig_value, perm_AUC = calculate_auc(y_true, pred, proba, 1000, SEED)
-        print(f"Significance value: {sig_value:.3f}")
+        avg_dist_test = np.mean(ad.measure(X_test))
+        print(f'Avg test dist: {avg_dist_test:.3f}')
         print(f"--------------------------------------------------------------")
 
 

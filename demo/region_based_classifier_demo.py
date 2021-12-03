@@ -1,17 +1,25 @@
 import os
 import sys
-sys.path.insert(0, os.getcwd()) 
 
+sys.path.insert(0, os.getcwd())
+
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from adad.evaluate import sensitivity_specificity, save_roc
 from adad.adversarial import SklearnRegionBasedClassifier
 from adad.utils import category2code, get_range, drop_redundant_col
 
 
 SEED = 1234
+TEST_RATIO = 0.4
+
+# Parameters for Region-Based Classifier
+R_MIN = 0.08
+R_MAX = 0.1
+STEP_SIZE = 1
+EPS = 0.01
 
 
 def run_dist():
@@ -33,7 +41,7 @@ def run_dist():
     print(X.shape, y.shape)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.4, random_state=SEED
+        X, y, test_size=TEST_RATIO, random_state=SEED
     )
     print(X_train.shape, X_test.shape)
 
@@ -50,29 +58,19 @@ def run_dist():
         sample_size=200,
         x_min=x_min,
         x_max=x_max,
-        r_min=0.08,
-        r_max=0.1,
-        step_size=1,
-        eps=0.01,
+        r_min=R_MIN,
+        r_max=R_MAX,
+        step_size=STEP_SIZE,
+        eps=EPS,
         data_type='discrete',
-        ci=0.9,
-        verbose=1,
-    )
+        verbose=1)
     ad.fit(X_train, y_train)
 
-    pred, idx = ad.predict(X_test)
-    print(f'Pass rate: {len(idx) /len(X_test) * 100:.2f}%')
+    avg_dist_train = np.mean(ad.measure(X_train))
+    print(f'Avg train dist: {avg_dist_train:.3f}')
 
-    score = ad.score(X_test, y_test) * 100
-    print(f'[With AD] Score: {score:.2f}%')
-
-    sensitivity, specificity = sensitivity_specificity(y_test[idx], pred)
-    print(f'Sensitivity: {sensitivity:.3f}')
-    print(f'Specificity: {specificity:.3f}')
-
-    proba, idx = ad.predict_proba(X_test)
-    path_roc = os.path.join(os.getcwd(), 'results', 'ames_roc.pdf')
-    save_roc(y_test[idx], proba, path_roc, title='Ames ROC Curve')
+    avg_dist_test = np.mean(ad.measure(X_test))
+    print(f'Avg test dist: {avg_dist_test:.3f}')
 
 
 if __name__ == '__main__':
