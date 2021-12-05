@@ -6,6 +6,9 @@ Further reading is here: https://docs.pytest.org/en/6.2.x/fixture.html#fixture-a
 
 Moreover, since we have many methods which have similar behaviour. It's good to
 group tests in class, so we might try to reuse them.
+
+To run this demo:
+$ python -m pytest -s ./demo/test_demo.py 
 """
 import pytest
 import numpy as np
