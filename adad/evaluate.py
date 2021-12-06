@@ -1,77 +1,85 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import rankdata
-from sklearn.metrics import (RocCurveDisplay, auc, confusion_matrix,
-                             hamming_loss, roc_curve)
+from sklearn.metrics import RocCurveDisplay, auc, confusion_matrix, roc_curve
+from sklearn.preprocessing import QuantileTransformer
 
 
 def sensitivity_specificity(y_true, y_pred):
-    """Compute sensitivity and specificity"""
+    """Compute sensitivity (True Positive Rate TPR) and specificity (True 
+    Negative Rate TNR)"""
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     sensitivity = tp / (tp + fn)
     specificity = tn / (tn + fp)
     return sensitivity, specificity
 
 
-def get_fpr_tpr(y_true, y_proba, y_pred):
-    """TODO: Could you explain the expected behaviour for this method?"""
-    tpr, fpr = [0.0], [0.0]
+def cumulative_accuracy(y_true, y_pred, dist_measure):
+    """Compute cumulative accuracy based on distance measures.
 
-    proba_c1 = [x[1] for x in y_proba]
-    idx_array = np.argsort(proba_c1)
+    Returns
+    -------
+    cumulative_acc: list
+        Cumulative Accuracy
+    cumulative_rate: list
+        The rate the samples that are used to compute `cumulate_acc`.
+    """
+    assert (
+        y_true.shape == y_pred.shape and y_true.shape == dist_measure.shape
+    ), "True labels, predictions and distance measures must have same shape."
 
-    y_pred_sorted = np.flip(y_pred[idx_array]).tolist()
-    y_true_sorted = np.flip(y_true[idx_array]).tolist()
+    idx_sorted = np.argsort(dist_measure)
+    y_true_sorted = y_true[idx_sorted]
+    y_pred_sorted = y_pred[idx_sorted]
+    n_sample = len(y_true)
+    cumulative_acc = np.zeros(n_sample)
+    for i in range(n_sample):
+        corrects = y_true_sorted[0: i + 1] == y_pred_sorted[0: i + 1]
+        cumulative_acc[i] = np.mean(corrects)
+    cumulative_rate = np.arange(1, n_sample + 1) / n_sample
+    return cumulative_acc, cumulative_rate
 
-    tp, tn, fp, fn = 0.0, 0.0, 0.0, 0.0
-    for i in range(len(y_true)):
-        tp += 1.0 if (y_true_sorted[i] == 1) & (y_pred_sorted[i] == 1) else 0.0
-        tn += 1.0 if (y_true_sorted[i] == 0) & (y_pred_sorted[i] == 0) else 0.0
-        fp += 1.0 if (y_true_sorted[i] == 0) & (y_pred_sorted[i] == 1) else 0.0
-        fn += 1.0 if (y_true_sorted[i] == 1) & (y_pred_sorted[i] == 0) else 0.0
 
-        if (fp != 0 or tn != 0):
-            fpr.append(fp / (fp + tn))
-        else:
-            fpr.append(0.0)
+def roc_ad(y_true, y_pred, dist_measure):
+    """Compute Receiver Operating Characteristic (ROC) based on Applicability
+    Domain distance.
 
-        if (tp != 0 or fn != 0):
-            tpr.append(tp / (tp + fn))
-        else:
-            tpr.append(0.0)
+    Parameters:
+    -----------
+    y_true: list
+        True labels
+    y_pred: list
+        Predicted labels; Same shape as `y_true`
+    dist_measure: list
+        Distance measures from Applicability Domain; Same shape as `y_true`. 
+        Lower value indicates the sample is within the AD.
 
-    fpr.sort()
-    tpr.sort()
+    Returns
+    -------
+    fpr: list
+        False Positive Rate for AD based on the distance measure
+    tpr: list
+        True Positive Rate for AD based on the distance measure
+    """
+    assert (
+        y_true.shape == y_pred.shape and y_true.shape == dist_measure.shape
+    ), "True labels, predictions and distance measures must have same shape."
+
+    y_err = np.array((y_true != y_pred), dtype=int)
+    fpr, tpr, _ = roc_curve(y_err, dist_measure, pos_label=1)
     return fpr, tpr
 
 
-def create_roc_graph(fpr, tpr, path, title=None, fontsize=14, figsize=(8, 8)):
-    """Plot and save ROC curve"""
-    # TODO: What's the expected behaviour?
-
-    plt.style.use('seaborn-whitegrid')
-    plt.xlabel("FPR", fontsize=14)
-    plt.ylabel("TPR", fontsize=14)
-    plt.title("ROC Curve", fontsize=14)
-
-    plt.rcParams["font.size"] = fontsize
-    _, ax = plt.subplots(figsize=figsize)
-    ax.tick_params(labelsize=fontsize)
-    plt.plot(fpr, tpr, color='blue', linewidth=2)
-    plt.plot([0.0, 1.0], [0.0, 1.0], linestyle='dashed',
-             color='red', linewidth=2, label='random')
-    if title:
-        ax.set_title(title)
-    plt.xlim(0.0, 1.0)
-    plt.ylim(0.0, 1.0)
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-
-
 def save_roc(y_true, y_score, path, title=None, fontsize=14, figsize=(8, 8)):
-    """TODO: What's the difference between this and `create_roc_graph`?"""
-    fpr, tpr, _ = roc_curve(y_true, y_score[:, 1], pos_label=1)
+    """Plot and save ROC curve.
+    TODO:  The ROC plot we need will contain multiple results for comparision. 
+    1. y_true and y_score should be (m,n) matrices, where m is # of algorithms,
+    n is # of samples.
+    2. `legends` is a required parameter.
+    """
     assert y_true.shape == y_score[:, 1].shape
+
+    fpr, tpr, _ = roc_curve(y_true, y_score[:, 1], pos_label=1)
     roc_auc = auc(fpr, tpr)
     plt.rcParams["font.size"] = fontsize
     _, ax = plt.subplots(figsize=figsize)
@@ -84,36 +92,10 @@ def save_roc(y_true, y_score, path, title=None, fontsize=14, figsize=(8, 8)):
     plt.savefig(path, dpi=300)
 
 
-def acc_vs_removed(y_true, y_pred, scores, plot=True, add=True, label=""):
-    """TODO: Could you explain the expected behaviour for this method?"""
-    s = np.argsort(scores)
-    #acc, rem = [0], [0]
-    acc_full = hamming_loss(y_true, y_pred)
-    acc, rem = [], []
-    for i in range(0, len(s) + 1):
-        acc.append(
-            (hamming_loss(y_true[s[i:]], y_pred[s[i:]]) - acc_full) / (1 - acc_full))
-        rem.append(i / len(s))
-    acc.append(1)
-    rem.append(1)
-
-    if plot:
-        plt.step(rem, acc, label=label)
-        plt.xlim([-0.05, 1.05])
-        #plt.ylim([-0.05, 1.05])
-        plt.xlabel("Ratio compounds removed")
-        plt.ylabel("Hamming_Accuracy")
-        if not add:
-            plt.legend()
-            plt.show()
-            plt.savefig(dpi=300)
-
-    # output area under curve
-    return np.sum(np.array(acc)[1:] * (np.array(rem)[1:] - np.array(rem)[:-1]))
-
-
-def calculate_auc(y_true, y_pred, dist_measure, n_permutation=10000):
-    """Calculates AUC via permutation test
+def permutation_auc(y_true, y_pred, dist_measure, n_permutation=10000):
+    """Computing randomized AUC value via permutation tests. This AUC result 
+    indicates the baseline of AUC when distance measures are assigned to random
+    values.
 
     Parameters:
     -----------
@@ -122,17 +104,23 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation=10000):
     y_pred: list
         Predicted labels; Same shape as `y_true`
     dist_measure: list
-        Distance measures from Applicability Domain; Same shape as `y_true`
+        Distance measures from Applicability Domain; Same shape as `y_true`.
+        Lower value indicates the sample is within the AD.
     n_permutation: int, default=10000
         Number of permutations.
 
     Returns:
     --------
     significance_val: float
-        95th percentile of permutation distribution.
+        95th percentile of permutation AUC value. If an algorithm reports an AUC
+        value which is no better than this, it indicates the results from the 
+        algorithm is no better than without AD (Insignificant).
     auc_perm: list
         AUC values for each permutation.
     """
+    assert (
+        y_true.shape == y_pred.shape and y_true.shape == dist_measure.shape
+    ), "True labels, predictions and distance measures must have same shape."
 
     idx_pred0 = np.where(y_pred == 0)[0]
     idx_pred1 = np.where(y_pred == 1)[0]
@@ -141,7 +129,7 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation=10000):
     n_true1 = len(np.where(y_true == 1)[0])
 
     idx_true0 = np.where(y_true == 0)[0]
-    
+
     # create array for permuted DM measure
     dist_measures_perm = np.zeros(len(dist_measure))
     auc_perm = np.zeros(n_permutation)
@@ -164,5 +152,49 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation=10000):
         auc_perm[i] = auc
 
     significance_val = np.percentile(auc_perm, 95)
-
     return significance_val, auc_perm
+
+
+def predictiveness_curves(y_true, y_pred, dist_measure, n_quantiles=100):
+    """Compute Predictiveness Curves for Applicability Domain. The X-axis is the
+    percentile of the distance measure, and Y-axis is the error rate.
+
+    Parameters:
+    -----------
+    y_true: list: 
+        True labels
+    y_pred: list
+        Predicted labels; Same shape as `y_true`
+    dist_measure: list
+        Distance measures from Applicability Domain; Same shape as `y_true`.
+        Lower value indicates the sample is within the AD.
+    n_quantiles: int, default=100
+        The number of the percentiles that the function will return. The value
+        must smaller than the number of samples in the data, e.g. len(y_true).
+
+    Returns:
+    --------
+    percentile: list
+        The percentile of the distance measure
+    error_rate: list
+        The coresponding error rate at the percentile
+    """
+    assert n_quantiles <= len(y_true), \
+        f'n_quantiles must smaller than {len(y_true)}. Got {n_quantiles}'
+    assert (
+        y_true.shape == y_pred.shape and y_true.shape == dist_measure.shape
+    ), "True labels, predictions and distance measures must have same shape."
+
+    transformer = QuantileTransformer(n_quantiles=n_quantiles)
+    dm_quantile = transformer.fit_transform(dist_measure.reshape(-1, 1))
+    dm_quantile = dm_quantile.reshape(-1)
+
+    percentile = np.linspace(0, 1, n_quantiles + 1)[1:]
+
+    y_err = np.array((y_true != y_pred), dtype=int)
+    error_rate = np.zeros_like(percentile)
+    for i, p in enumerate(percentile):
+        idx = np.where(dm_quantile <= p)
+        err = np.mean(y_err[idx]) if len(idx) > 0 else 0
+        error_rate[i] = err
+    return percentile, error_rate
