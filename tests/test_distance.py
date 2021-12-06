@@ -7,7 +7,7 @@ from numpy.random import randint
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from adad.distance import DAIndexGamma
+from adad.distance import DAIndexGamma, DAIndexKappa, DAIndexDelta
 
 SEED = 348
 np.random.seed(348)
@@ -54,36 +54,63 @@ def test_Gamma_measure():
 
     assert all([type(x) == np.bool_ for x in results2])
 
+def test_Kappa_constructor():
+    ad = DAIndexKappa(dist_metric='euclidean')
+    assert ad.dist_metric == 'euclidean'
 
-def test_Gamma_predict():
-    ad = DAIndexGamma(clf=classifier)
+    with pytest.raises(AssertionError) as e_info:
+        ad = DAIndexGamma(dist_metric='asdkjnas')
+    
+def test_Kappa_fit():
+    ad = DAIndexKappa()
     ad.fit(X_train)
-    predict, indexs = ad.predict(X_test)
-    p_size, i_size = len(predict), len(indexs)
-
-    assert i_size > 0 and i_size <= len(X_test)
-    assert p_size > 0 and p_size <= len(X_test)
-    assert i_size == p_size
-
-
-def test_Gamma_predict_proba():
-    ad = DAIndexGamma(clf=classifier)
+    
+    dist, _ = ad.tree.query(X_train, k=ad.k + 1)
+    dist_mean = np.sum(dist, axis=1) / ad.k
+    dist_sorted = np.sort(dist_mean)
+    idx = int(np.floor(ad.ci * len(X_train)))
+    
+    assert ad.threshold <= dist_sorted[len(X_train)- 1] and ad.threshold >= dist_sorted[idx - 1]
+    
+def test_Kappa_measure():
+    ad = DAIndexKappa(clf=classifier)
     ad.fit(X_train)
-    predict, indexs = ad.predict_proba(X_test)
-    p_size, i_size = len(predict), len(indexs)
+    results = ad.measure(X_train)
+    
+    assert all([type(x) == np.bool_ for x in results])
+    
+    results2 = ad.measure(X_test)
+    
+    assert all([type(x) == np.bool_ for x in results2])   
 
-    assert i_size > 0 and i_size <= len(X_test)
-    assert p_size > 0 and p_size <= len(X_test)
-    assert i_size == p_size
+def test_Delta_constructor():
+    ad = DAIndexDelta(dist_metric='euclidean')
+    assert ad.dist_metric == 'euclidean'
 
+    with pytest.raises(AssertionError) as e_info:
+        ad = DAIndexGamma(dist_metric='asdkjnas')
 
-def test_Gamma_score():
-    ad = DAIndexGamma(clf=classifier)
+def test_Delta_fit():
+    ad = DAIndexDelta()
     ad.fit(X_train)
-    score = ad.score(X_test, y_test)
-
-    assert score >= 0 and score <= 1
-
+    
+    dist, _ = ad.tree.query(X_train, k=ad.k + 1)
+    dist_mean = np.sum(dist, axis=1) / ad.k
+    dist_sorted = np.sort(dist_mean)
+    idx = int(np.floor(ad.ci * len(X_train)))
+    
+    assert ad.threshold <= dist_sorted[len(X_train)- 1] and ad.threshold >= dist_sorted[idx - 1]
+    
+def test_Delta_measure():
+    ad = DAIndexDelta(clf=classifier)
+    ad.fit(X_train)
+    results = ad.measure(X_train)
+    
+    assert all([type(x) == np.bool_ for x in results])
+    
+    results2 = ad.measure(X_test)
+    
+    assert all([type(x) == np.bool_ for x in results2])
 
 def test_ad_save():
     path = os.path.join(os.getcwd(), "tests//save_files")
