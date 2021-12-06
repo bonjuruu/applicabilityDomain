@@ -112,7 +112,7 @@ def acc_vs_removed(y_true, y_pred, scores, plot=True, add=True, label=""):
     return np.sum(np.array(acc)[1:] * (np.array(rem)[1:] - np.array(rem)[:-1]))
 
 
-def calculate_auc(y_true, y_pred, dist_measure, n_permutation):
+def calculate_auc(y_true, y_pred, dist_measure, n_permutation=10000):
     """Calculates AUC via permutation test
 
     Parameters:
@@ -123,7 +123,7 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation):
         Predicted labels; Same shape as `y_true`
     dist_measure: list
         Distance measures from Applicability Domain; Same shape as `y_true`
-    n_permutation: int
+    n_permutation: int, default=10000
         Number of permutations.
 
     Returns:
@@ -137,8 +137,6 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation):
     idx_pred0 = np.where(y_pred == 0)[0]
     idx_pred1 = np.where(y_pred == 1)[0]
 
-    n_pred0 = len(idx_pred0)
-    n_pred1 = len(idx_pred1)
     n_true0 = len(np.where(y_true == 0)[0])
     n_true1 = len(np.where(y_true == 1)[0])
 
@@ -150,8 +148,8 @@ def calculate_auc(y_true, y_pred, dist_measure, n_permutation):
 
     for i in range(n_permutation):
         # randomly permute class indices based on predicted values
-        idx_pred0_perm = idx_pred0[np.random.permutation(n_pred0)]
-        idx_pred1_perm = idx_pred1[np.random.permutation(n_pred1)]
+        idx_pred0_perm = np.random.permutation(idx_pred0)
+        idx_pred1_perm = np.random.permutation(idx_pred1)
 
         # assign permuted DM measures
         dist_measures_perm[idx_pred0] = dist_measure[idx_pred0_perm]
