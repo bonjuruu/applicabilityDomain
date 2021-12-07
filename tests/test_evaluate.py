@@ -1,63 +1,137 @@
-import os
-import pandas as pd
+"""Testing methods in adad.evaluate.py
+"""
 import numpy as np
 import pytest
-from numpy.random import randint
+from adad.evaluate import (cumulative_accuracy, permutation_auc,
+                           predictiveness_curves, roc_ad, save_roc,
+                           sensitivity_specificity)
+from adad.utils import set_seed
 
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-
-from adad.evaluate import acc_vs_removed, calculate_auc, sensitivity_specificity, save_roc
-from adad.distance import DAIndexGamma
-
-SEED = 348
-np.random.seed(348)
-
-X = randint(5, size=(20, 5))
-y = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1])
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=SEED)
-
-classifier = RandomForestClassifier(random_state=SEED)
-classifier.fit(X_train, y_train)
-
-ad = DAIndexGamma(clf=classifier)
-ad.fit(X_train)
+@pytest.fixture(autouse=True)
+def setup():
+    set_seed(1234)
 
 
-def test_sensitivity_specificity():
-    y_pred, idx = ad.predict(X_test)
-    sensitivity, specificity = sensitivity_specificity(y_test[idx], y_pred)
+@pytest.fixture
+def input1():
+    y_true = np.concatenate((np.ones(5), np.zeros(5))).astype(int)
+    y_pred = np.copy(y_true)
+    return y_true, y_pred
 
-    assert sensitivity >= 0 and sensitivity <= 1
-    if str(specificity) == "nan":
+
+@pytest.fixture
+def input2():
+    y_true = np.concatenate((np.ones(5), np.zeros(5))).astype(int)
+    y_pred = np.concatenate((np.zeros(5), np.ones(5))).astype(int)
+    return y_true, y_pred
+
+
+@pytest.fixture
+def input3():
+    y_true = np.ones(10, dtype=int)
+    y_pred = np.zeros(10, dtype=int)
+    return y_true, y_pred
+
+
+@pytest.fixture
+def input4():
+    y_true = np.ones(10, dtype=int)
+    y_pred = np.concatenate(([1], np.zeros(9))).astype(int)
+    return y_true, y_pred
+
+
+@pytest.fixture
+def input5():
+    y_true = np.concatenate((np.ones(5), np.zeros(5))).astype(int)
+    y_pred = np.concatenate((np.ones(3), np.zeros(5), np.ones(2))).astype(int)
+    return y_true, y_pred
+
+
+@pytest.fixture
+def dist_measure1():
+    return np.ones(10, dtype=float)
+
+
+@pytest.fixture
+def dist_measure2():
+    return np.linspace(0.1, 1.0, num=10)
+
+
+class TestEvaluate:
+    def test_cumulative_accuracy(self, input1, input2, input4, dist_measure1,
+                                 dist_measure2):
+        # All positive case
+        acc, rate = cumulative_accuracy(*input1, dist_measure=dist_measure1)
+        assert len(acc) == 10
+        np.testing.assert_equal(acc, 1.0)
+        assert acc.shape == rate.shape
+        # Expecting 0.1, 0.2, ..., 1.0
+        target = np.linspace(0.1, 1.0, num=10)
+        np.testing.assert_array_almost_equal(rate, target)
+
+        # All negative case
+        acc, _ = cumulative_accuracy(*input2, dist_measure=dist_measure1)
+        np.testing.assert_equal(acc, 0.)
+
+        # Mixed case
+        acc, _ = cumulative_accuracy(*input4, dist_measure=dist_measure2)
+        target = 1. / np.linspace(1, 10, num=10)
+        np.testing.assert_array_almost_equal(acc, target)
+
+    def test_permutation_auc(self, input5, dist_measure2):
+        # Implemented based on Matlab code from:
+        # https://jcheminf.biomedcentral.com/articles/10.1186/s13321-017-0230-2
+        # Do not handle extrema
+        perm_auc, _ = permutation_auc(*input5, dist_measure2)
+        # Value is based on observation:
+        np.testing.assert_almost_equal(perm_auc, 0.88, decimal=2)
+
+    def test_predictiveness_curves(self, input1, input2, input5, dist_measure2):
+        # All positive case
+        percentile, error_rate = predictiveness_curves(
+            *input1, dist_measure2, n_quantiles=10)
+        target = np.linspace(0.1, 1, num=10)
+        np.testing.assert_array_almost_equal(percentile, target)
+        np.testing.assert_array_equal(error_rate, np.zeros_like(error_rate))
+
+        # All negative case
+        _, error_rate = predictiveness_curves(
+            *input2, dist_measure2, n_quantiles=10)
+        np.testing.assert_array_equal(error_rate, np.ones_like(error_rate))
+
+        # Mixed case
+        _, error_rate = predictiveness_curves(
+            *input5, dist_measure2, n_quantiles=10)
+        target = np.array([0, 0, 0, 1 / 4, 1 / 2.5, 1 / 3,
+                          1 / 3.5, 1 / 4, 1 / 3, 1 / 2.5])
+        np.testing.assert_array_almost_equal(error_rate, target)
+
+    def test_roc_ad(self, input5, dist_measure2):
+        # The sklearn.metrics.roc_curve method does NOT handle extreme case.
+        # It returns nan on tpr if there's no false positives.
+        fpr, tpr = roc_ad(*input5, dist_measure2)
+        assert fpr.shape == tpr.shape
+        np.testing.assert_almost_equal(fpr, [0., 0., 0., 0.5, 0.5, 1.])
+        np.testing.assert_array_almost_equal(tpr, [0., 0.25, 0.5, 0.5, 1., 1.])
+
+    def test_save_roc(self):
+        # TODO: This method is not completed.
+        # save_roc(...)
         pass
-    assert specificity >= 0 and specificity <= 1
 
+    def test_sensitivity_specificity(self, input1, input2, input3):
+        # All positive case
+        tpr, tnr = sensitivity_specificity(*input1)
+        assert tpr == 1
+        assert tnr == 1
 
-def test_save_roc():
-    path = os.path.join(os.getcwd(), "tests//results")
-    file_path = os.path.join(path, "test_result.png")
+        # All negative case 1
+        tpr, tnr = sensitivity_specificity(*input2)
+        assert tpr == 0
+        assert tnr == 0
 
-    y_proba, idx = ad.predict_proba(X_test)
-
-    save_roc(y_test[idx], y_proba, file_path, title="Test ROC Curve")
-
-    assert os.path.exists(file_path)
-
-
-def test_acc_vs_remove():
-    y_pred, idx = ad.predict(X_test)
-    acc_vs_removed(y_test, y_pred, y_pred)
-
-
-def test_calculate_auc():
-    y_pred, idx = ad.predict(X_test)
-    y_true = y_test[idx]
-    y_proba, idx = ad.predict_proba(X_test)
-
-    sig_value, perm_AUC = calculate_auc(y_true, y_pred, y_proba, 1000)
-    assert len(perm_AUC) == 1000
-    assert sig_value >= 0 and sig_value <= 1
+        # All negative case 2
+        tpr, tnr = sensitivity_specificity(*input3)
+        assert tpr == 0
+        assert tnr == 0

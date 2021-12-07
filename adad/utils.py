@@ -9,11 +9,6 @@ from pandas.api.types import CategoricalDtype
 logger = logging.getLogger(__name__)
 
 
-def time2str(time_elapsed, formatstr='%Hh%Mm%Ss'):
-    """Format millisecond to string."""
-    return time.strftime(formatstr, time.gmtime(time_elapsed))
-
-
 def category2code(df):
     """Change all columns to ordinal data, represent in codes.
     (e.g.: from {2, 5, 8} to {0, 1, 2})
@@ -66,3 +61,8 @@ def set_seed(random_state=None):
     # torch.backends.cudnn.deterministic = True
     logger.info(f'Set random state to: {random_state}')
     return random_state
+
+
+def time2str(time_elapsed, formatstr='%Hh%Mm%Ss'):
+    """Format millisecond to string."""
+    return time.strftime(formatstr, time.gmtime(time_elapsed))

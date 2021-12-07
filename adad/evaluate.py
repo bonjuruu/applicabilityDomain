@@ -9,8 +9,8 @@ def sensitivity_specificity(y_true, y_pred):
     """Compute sensitivity (True Positive Rate TPR) and specificity (True 
     Negative Rate TNR)"""
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    sensitivity = tp / (tp + fn)
-    specificity = tn / (tn + fp)
+    sensitivity = tp / (tp + fn) if tp + fn != 0 else 0
+    specificity = tn / (tn + fp) if tn + fp != 0 else 0
     return sensitivity, specificity
 
 
