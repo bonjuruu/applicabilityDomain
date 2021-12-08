@@ -1,17 +1,24 @@
 """Testing methods in adad.evaluate.py
 """
+import os
+
 import numpy as np
 import pytest
-import os
-from adad.evaluate import (cumulative_accuracy, permutation_auc,
-                           predictiveness_curves, roc_ad, save_roc,
+from adad.evaluate import (cumulative_accuracy, permutation_auc, plot_roc,
+                           predictiveness_curves, roc_ad,
                            sensitivity_specificity)
 from adad.utils import set_seed
+
+PATH_TEST = os.path.join(os.getcwd(), 'tests', 'results')
 
 
 @pytest.fixture(autouse=True)
 def setup():
     set_seed(1234)
+
+    if not os.path.exists(PATH_TEST):
+        print('Creating dir:', PATH_TEST)
+        os.mkdir(PATH_TEST)
 
 
 @pytest.fixture
@@ -48,15 +55,17 @@ def input5():
     y_pred = np.concatenate((np.ones(3), np.zeros(5), np.ones(2))).astype(int)
     return y_true, y_pred
 
+
 @pytest.fixture
 def input6():
-    y_true = np.array((np.ones(10, dtype=int), 
+    y_true = np.array((np.ones(10, dtype=int),
                        np.zeros(10, dtype=int),
                        np.concatenate((np.ones(5), np.zeros(5))).astype(int),
                        np.concatenate((np.zeros(5), np.ones(5))).astype(int))
-                        )
+                      )
     y_score = np.random.rand(4, 10)
     return y_true, y_score
+
 
 @pytest.fixture
 def dist_measure1():
@@ -66,6 +75,21 @@ def dist_measure1():
 @pytest.fixture
 def dist_measure2():
     return np.linspace(0.1, 1.0, num=10)
+
+
+@pytest.fixture
+def fprs_tprs():
+    fprs = (
+        np.linspace(0, 1, 10),
+        np.array([0., .2, 1.]),
+        np.linspace(0, 1, 10),
+    )
+    tprs = (
+        np.linspace(0, 1, 10),
+        np.array([0., .8, 1.]),
+        np.concatenate(([0.], np.linspace(0.8, 1, 9),))
+    )
+    return fprs, tprs
 
 
 class TestEvaluate:
@@ -125,14 +149,22 @@ class TestEvaluate:
         np.testing.assert_almost_equal(fpr, [0., 0., 0., 0.5, 0.5, 1.])
         np.testing.assert_array_almost_equal(tpr, [0., 0.25, 0.5, 0.5, 1., 1.])
 
-    def test_save_roc(self, input6):
+    def test_plot_roc(self, fprs_tprs):
         # Checks if a roc graph is made with an (m, n) matrix under the correct path location
-        y_true, y_score = input6
-        path_roc = os.path.join(os.getcwd(), 'tests', 'results', 'test_roc.pdf')
-        save_roc(*input6, path=path_roc, title="Test ROC")
+        fprs, tprs = fprs_tprs
+        legend = [f'Model{i}' for i in range(len(fprs))]
+        path_roc = os.path.join(PATH_TEST, 'test_roc.pdf')
+        plot_roc(fprs, tprs, legend=legend, path=path_roc, title="Test ROC")
+        assert os.path.exists(path_roc)
+
+        # Remove generated file
+        os.remove(path_roc)
+
+        # Testing on ploting single model
+        plot_roc(fprs[:1], tprs[:1], legend=legend[:1],
+                 path=path_roc, title="Test ROC")
         assert os.path.exists(path_roc)
         os.remove(path_roc)
-        assert not os.path.exists(path_roc)
 
     def test_sensitivity_specificity(self, input1, input2, input3):
         # All positive case

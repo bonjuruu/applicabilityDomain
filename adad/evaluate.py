@@ -1,9 +1,11 @@
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import rankdata
 from sklearn.metrics import RocCurveDisplay, auc, confusion_matrix, roc_curve
 from sklearn.preprocessing import QuantileTransformer
-import pandas as pd
 
 
 def sensitivity_specificity(y_true, y_pred):
@@ -71,55 +73,58 @@ def roc_ad(y_true, y_pred, dist_measure):
     return fpr, tpr
 
 
-def save_roc(y_true, y_score, path, title=None, fontsize=14, figsize=(8, 8)):
-    """Plot and save ROC curve.
-    The ROC plot contains multiple results for comparision. 
-    
+def plot_roc(fprs, tprs, legend, path=None, title=None, fontsize=14, figsize=(8, 8)):
+    """Plot and save ROC curve for multiple models for comparision. 
+
     Parameters:
     -----------
-    y_true: list:
-        (m, n) matrix of true labels
-    y_score: list:
-        (m, n) matrix of scores
-    path: string:
-        Path to save ROC curve
-    title: string:
-        Title for ROC curve
-    fontsize: int:
+    fprs: tuple of list
+        A tuple of False Positive Rates
+    tprs: tuple of list
+        A tuple of True Positive Rates
+    legend: list
+    path: string, default=None
+        Path to save ROC curve. If it's None, then no figure will be saved.
+    title: string, default=None
+        Title for the figure
+    fontsize: int
         Font size for graph
-    figsize: tuple:
-        (x, y) of the size of the graph
+    figsize: tuple, default=(8, 8)
+        (width, height) of the size of the graph
     """
-    assert y_true.shape == y_score.shape
+    n_models = len(fprs)
+    assert n_models == len(tprs), 'In input pair should have same length.'
+    assert n_models == len(legend), \
+        "The plot's legend should have same length as the input pairs"
 
-    num_rows, num_cols = y_true.shape
-    results = pd.DataFrame(columns=['fpr', 'tpr', 'auc'])
-    
-    for row in range(num_rows):
-        fpr, tpr, _ = roc_curve(y_true[row], y_score[row])
-        roc_auc = auc(fpr, tpr)
-        results = results.append({'fpr': fpr, 'tpr': tpr, 'auc': roc_auc}, ignore_index=True)
-    
     plt.rcParams["font.size"] = fontsize
     _, ax = plt.subplots(figsize=figsize)
-    ax.tick_params(labelsize=fontsize)
-    
-    for i in range(results.shape[0]):
-        ax.plot(results.loc[i]['fpr'], results.loc[i]['tpr'], label="AUC={:.3f}".format(results.loc[i]['auc']))
-    
-    ax.plot([0,1], [0,1], color='orange', linestyle='--')
-    
-    ax.set_xticks(np.arange(0.0, 1.1, step=0.1))
-    ax.set_xlabel("False Positive Rate")
-    ax.set_yticks(np.arange(0.0, 1.1, step=0.1))
-    ax.set_ylabel("True Positive Rate")
-    
-    ax.legend(loc='lower right')
-    if title:
+    fprs = list(fprs)
+    tprs = list(tprs)
+    legend = list(legend)
+    # Adding plot for each model
+    for i in range(n_models):
+        fpr = fprs[i]
+        tpr = tprs[i]
+        roc_auc = auc(fpr, tpr)
+        RocCurveDisplay(
+            fpr=fpr,
+            tpr=tpr,
+            roc_auc=roc_auc,
+            estimator_name=legend[i]
+        ).plot(ax=ax)
+    if title is not None:
         ax.set_title(title)
-    
     plt.tight_layout()
-    plt.savefig(path, dpi=300)
+    # Only display the plot
+    if path is None:
+        plt.show()
+    else:
+        # Create new directory when it doesn't exist
+        path_parent = Path(path).absolute().parent
+        if not os.path.exists(path_parent):
+            os.makedirs(path_parent)
+        plt.savefig(path, dpi=300)
 
 
 def permutation_auc(y_true, y_pred, dist_measure, n_permutation=10000):
