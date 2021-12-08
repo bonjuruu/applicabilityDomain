@@ -93,7 +93,7 @@ def plot_roc(fprs, tprs, legend, path=None, title=None, fontsize=14, figsize=(8,
         (width, height) of the size of the graph
     """
     n_models = len(fprs)
-    assert n_models == len(tprs), 'In input pair should have same length.'
+    assert n_models == len(tprs), 'Input pairs should have same length.'
     assert n_models == len(legend), \
         "The plot's legend should have same length as the input pairs"
 
@@ -134,7 +134,7 @@ def permutation_auc(y_true, y_pred, dist_measure, n_permutation=10000):
 
     Parameters:
     -----------
-    y_true: list: 
+    y_true: list
         True labels
     y_pred: list
         Predicted labels; Same shape as `y_true`
@@ -196,7 +196,7 @@ def predictiveness_curves(y_true, y_pred, dist_measure, n_quantiles=100):
 
     Parameters:
     -----------
-    y_true: list: 
+    y_true: list
         True labels
     y_pred: list
         Predicted labels; Same shape as `y_true`
