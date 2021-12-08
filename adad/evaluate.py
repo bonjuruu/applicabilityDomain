@@ -3,6 +3,7 @@ import numpy as np
 from scipy.stats import rankdata
 from sklearn.metrics import RocCurveDisplay, auc, confusion_matrix, roc_curve
 from sklearn.preprocessing import QuantileTransformer
+import pandas as pd
 
 
 def sensitivity_specificity(y_true, y_pred):
@@ -72,22 +73,51 @@ def roc_ad(y_true, y_pred, dist_measure):
 
 def save_roc(y_true, y_score, path, title=None, fontsize=14, figsize=(8, 8)):
     """Plot and save ROC curve.
-    TODO:  The ROC plot we need will contain multiple results for comparision. 
-    1. y_true and y_score should be (m,n) matrices, where m is # of algorithms,
-    n is # of samples.
-    2. `legends` is a required parameter.
+    The ROC plot contains multiple results for comparision. 
+    
+    Parameters:
+    -----------
+    y_true: list:
+        (m, n) matrix of true labels
+    y_score: list:
+        (m, n) matrix of scores
+    path: string:
+        Path to save ROC curve
+    title: string:
+        Title for ROC curve
+    fontsize: int:
+        Font size for graph
+    figsize: tuple:
+        (x, y) of the size of the graph
     """
-    assert y_true.shape == y_score[:, 1].shape
+    assert y_true.shape == y_score.shape
 
-    fpr, tpr, _ = roc_curve(y_true, y_score[:, 1], pos_label=1)
-    roc_auc = auc(fpr, tpr)
+    num_rows, num_cols = y_true.shape
+    results = pd.DataFrame(columns=['fpr', 'tpr', 'auc'])
+    
+    for row in range(num_rows):
+        fpr, tpr, _ = roc_curve(y_true[row], y_score[row])
+        roc_auc = auc(fpr, tpr)
+        results = results.append({'fpr': fpr, 'tpr': tpr, 'auc': roc_auc}, ignore_index=True)
+    
     plt.rcParams["font.size"] = fontsize
     _, ax = plt.subplots(figsize=figsize)
     ax.tick_params(labelsize=fontsize)
-    RocCurveDisplay(
-        fpr=fpr, tpr=tpr, roc_auc=roc_auc).plot(ax=ax)
+    
+    for i in range(results.shape[0]):
+        ax.plot(results.loc[i]['fpr'], results.loc[i]['tpr'], label="AUC={:.3f}".format(results.loc[i]['auc']))
+    
+    ax.plot([0,1], [0,1], color='orange', linestyle='--')
+    
+    ax.set_xticks(np.arange(0.0, 1.1, step=0.1))
+    ax.set_xlabel("False Positive Rate")
+    ax.set_yticks(np.arange(0.0, 1.1, step=0.1))
+    ax.set_ylabel("True Positive Rate")
+    
+    ax.legend(loc='lower right')
     if title:
         ax.set_title(title)
+    
     plt.tight_layout()
     plt.savefig(path, dpi=300)
 

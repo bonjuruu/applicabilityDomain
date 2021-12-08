@@ -2,6 +2,7 @@
 """
 import numpy as np
 import pytest
+import os
 from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad, save_roc,
                            sensitivity_specificity)
@@ -47,6 +48,15 @@ def input5():
     y_pred = np.concatenate((np.ones(3), np.zeros(5), np.ones(2))).astype(int)
     return y_true, y_pred
 
+@pytest.fixture
+def input6():
+    y_true = np.array((np.ones(10, dtype=int), 
+                       np.zeros(10, dtype=int),
+                       np.concatenate((np.ones(5), np.zeros(5))).astype(int),
+                       np.concatenate((np.zeros(5), np.ones(5))).astype(int))
+                        )
+    y_score = np.random.rand(4, 10)
+    return y_true, y_score
 
 @pytest.fixture
 def dist_measure1():
@@ -115,10 +125,14 @@ class TestEvaluate:
         np.testing.assert_almost_equal(fpr, [0., 0., 0., 0.5, 0.5, 1.])
         np.testing.assert_array_almost_equal(tpr, [0., 0.25, 0.5, 0.5, 1., 1.])
 
-    def test_save_roc(self):
-        # TODO: This method is not completed.
-        # save_roc(...)
-        pass
+    def test_save_roc(self, input6):
+        # Checks if a roc graph is made with an (m, n) matrix under the correct path location
+        y_true, y_score = input6
+        path_roc = os.path.join(os.getcwd(), 'tests', 'results', 'test_roc.pdf')
+        save_roc(*input6, path=path_roc, title="Test ROC")
+        assert os.path.exists(path_roc)
+        os.remove(path_roc)
+        assert not os.path.exists(path_roc)
 
     def test_sensitivity_specificity(self, input1, input2, input3):
         # All positive case
