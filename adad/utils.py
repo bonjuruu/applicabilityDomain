@@ -1,6 +1,8 @@
+import datetime
 import logging
 import random
 import time
+import json
 
 import numpy as np
 import pandas as pd
@@ -66,3 +68,30 @@ def set_seed(random_state=None):
 def time2str(time_elapsed, formatstr='%Hh%Mm%Ss'):
     """Format millisecond to string."""
     return time.strftime(formatstr, time.gmtime(time_elapsed))
+
+
+def to_json(data_dict, path):
+    """Save dictionary as JSON."""
+    def converter(obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, datetime.datetime):
+            return obj.__str__()
+
+    with open(path, 'w') as file:
+        logger.info('Save to:', path)
+        json.dump(data_dict, file, default=converter)
+
+
+def open_json(path):
+    """Read JSON file."""
+    try:
+        with open(path, 'r') as file:
+            data_json = json.load(file)
+            return data_json
+    except:
+        logger.error(f'Cannot open {path}')
