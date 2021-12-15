@@ -1,8 +1,9 @@
 import datetime
+import json
 import logging
+import os
 import random
 import time
-import json
 
 import numpy as np
 import pandas as pd
@@ -95,3 +96,32 @@ def open_json(path):
             return data_json
     except:
         logger.error(f'Cannot open {path}')
+
+
+def create_dir(path):
+    """Create directory if the input path is not found."""
+    if not os.path.exists(path):
+        logger.info('Creating directory:', path)
+        os.makedirs(path)
+
+
+def open_csv(path_data, label_name='y'):
+    """Read data from a CSV file, return X, y and column names."""
+    logger.info('Load from:', path_data)
+    df_data = pd.read_csv(path_data)
+    y = df_data[label_name].to_numpy()
+    df_data = df_data.drop([label_name], axis=1)
+    cols = df_data.columns
+    X = df_data.to_numpy()
+    return X, y, cols
+
+
+def to_csv(X, y, cols, path_data):
+    """Save data into a CSV file."""
+    logger.info('Save to:', path_data)
+    df = pd.DataFrame(X, columns=cols, dtype=np.float32)
+    labels = len(np.unique(y))
+    assert labels == 2, f'Expecting 2 classes, got {labels}'
+    df['y'] = pd.Series(y, dtype=int)
+    df['y'] = df['y'].astype('category').cat.codes
+    df.to_csv(path_data, index=False)

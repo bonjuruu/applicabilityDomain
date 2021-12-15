@@ -6,7 +6,8 @@ from .evaluate import (cumulative_accuracy, permutation_auc, plot_roc,
                        predictiveness_curves, roc_ad, sensitivity_specificity)
 from .probability import ProbabilityClassifier
 from .utils import (category2code, drop_redundant_col, get_range, maccs2binary,
-                    set_seed, time2str, to_json, open_json)
+                    set_seed, time2str, to_json, open_json, create_dir,
+                    open_csv, to_csv)
 
 __all__ = [
     'SklearnRegionBasedClassifier',
@@ -15,5 +16,6 @@ __all__ = [
     'predictiveness_curves', 'roc_ad', 'sensitivity_specificity',
     'ProbabilityClassifier',
     'category2code', 'drop_redundant_col', 'get_range', 'maccs2binary',
-    'set_seed', 'time2str', 'to_json', 'open_json'
+    'set_seed', 'time2str', 'to_json', 'open_json', 'create_dir', 'open_csv',
+    'to_csv',
 ]
