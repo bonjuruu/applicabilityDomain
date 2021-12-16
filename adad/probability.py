@@ -26,6 +26,6 @@ class ProbabilityClassifier(AppDomainBase):
     
     def measure(self, X):
         all_p_x = [max(x) for x in self.clf.predict_proba(X)]
-        all_error_p = [1 - x for x in all_p_x]
+        all_error_p = np.array([1 - x for x in all_p_x])
 
         return all_error_p
