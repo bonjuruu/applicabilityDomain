@@ -13,15 +13,11 @@ DISTANCE_METRICS = [
     # For floats
     'euclidean',
     'manhattan',
-    'chebyshev',
-    'minkowski',
-    'wminkowski',
-    'seuclidean',
-    'mahalanobis',
+    # 'mahalanobis',  # Requires metric_params={'V': np.cov(X), 'VI': <inverse of V>}
     # For integers
     'hamming',
-    'canberra',
-    'braycurtis',
+    # For boolean-vectors,
+    'jaccard',  # Tanimoto
 ]
 
 
@@ -39,10 +35,9 @@ class DAIndexGamma(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
+    def __init__(self, k=5, dist_metric='euclidean'):
         super(DAIndexGamma, self).__init__()
 
-        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
@@ -78,10 +73,9 @@ class DAIndexKappa(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
+    def __init__(self, k=5, dist_metric='euclidean'):
         super(DAIndexKappa, self).__init__()
 
-        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
@@ -90,7 +84,6 @@ class DAIndexKappa(AppDomainBase):
         self.dist_measure_train = None
 
     def fit(self, X):
-        n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
         dist_at_k = dist[:, -1]
@@ -119,10 +112,9 @@ class DAIndexDelta(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
+    def __init__(self, k=5, dist_metric='euclidean'):
         super(DAIndexDelta, self).__init__()
 
-        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS

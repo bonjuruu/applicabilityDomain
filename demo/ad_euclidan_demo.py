@@ -36,7 +36,7 @@ def run_dist():
 
     for AD in [DAIndexGamma, DAIndexKappa, DAIndexDelta]:
         print(f'Running {AD.__name__}...')
-        ad = AD(model)
+        ad = AD()
         ad.fit(X_train)
 
         score = model.score(X_train, y_train)
