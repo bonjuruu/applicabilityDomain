@@ -153,6 +153,11 @@ class SklearnRegionBasedClassifier(AppDomainBase):
         logger.info(f'Best r: {r_mid:.4f}')
         return self
 
+    def set_params(self, r, n_class=2):
+        """Set the parameter without training (calling the fit method)."""
+        self.r = r
+        self.n_class = n_class
+
     def measure(self, X):
         """Check AD on X. Smaller value indicates it within the domain."""
         pred_pt = self.clf.predict(X).astype(int)
