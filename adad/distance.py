@@ -13,7 +13,6 @@ DISTANCE_METRICS = [
     # For floats
     'euclidean',
     'manhattan',
-    # 'mahalanobis',  # Requires metric_params={'V': np.cov(X), 'VI': <inverse of V>}
     # For integers
     'hamming',
     # For boolean-vectors,
@@ -35,9 +34,10 @@ class DAIndexGamma(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, k=5, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexGamma, self).__init__()
 
+        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
@@ -45,7 +45,11 @@ class DAIndexGamma(AppDomainBase):
         self.tree = None
         self.dist_measure_train = None
 
-    def fit(self, X):
+    def fit(self, X, y=None):
+        if self.clf is not None and y is not None:
+            y_pred = self.clf.predict(X)
+            idx = np.where(y == y_pred)[0]
+            X = X[idx]
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
         dist_mean = np.mean(dist[:, 1:], axis=1)
@@ -73,9 +77,10 @@ class DAIndexKappa(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, k=5, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexKappa, self).__init__()
 
+        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
@@ -83,7 +88,11 @@ class DAIndexKappa(AppDomainBase):
         self.tree = None
         self.dist_measure_train = None
 
-    def fit(self, X):
+    def fit(self, X, y=None):
+        if self.clf is not None and y is not None:
+            y_pred = self.clf.predict(X)
+            idx = np.where(y == y_pred)[0]
+            X = X[idx]
         self.tree = BallTree(X, metric=self.dist_metric)
         dist, _ = self.tree.query(X, k=self.k + 1)
         dist_at_k = dist[:, -1]
@@ -112,9 +121,10 @@ class DAIndexDelta(AppDomainBase):
         Confidence interval. It should in-between (0, 1].
     """
 
-    def __init__(self, k=5, dist_metric='euclidean'):
+    def __init__(self, clf=None, k=5, dist_metric='euclidean'):
         super(DAIndexDelta, self).__init__()
 
+        self.clf = clf
         self.k = k
         self.dist_metric = dist_metric
         assert dist_metric in DISTANCE_METRICS
@@ -122,7 +132,11 @@ class DAIndexDelta(AppDomainBase):
         self.tree = None
         self.dist_measure_train = None
 
-    def fit(self, X):
+    def fit(self, X, y=None):
+        if self.clf is not None and y is not None:
+            y_pred = self.clf.predict(X)
+            idx = np.where(y == y_pred)[0]
+            X = X[idx]
         self.X = np.copy(X)
         n = len(X)
         self.tree = BallTree(X, metric=self.dist_metric)
