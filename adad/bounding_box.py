@@ -19,6 +19,7 @@ class PCABoundingBox():
         self.AABB = np.array([[min(X_trf[:,i]), max(X_trf[:,i])] for i in range(len(X_trf[0]))])
 
     def measure(self, X):
+        # reutrn the scores of all the samples
         return self.pca.score_samples(X)
     
     def predict(self, X):
