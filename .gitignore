@@ -156,3 +156,5 @@ test.*
 # Do not save test results
 tests/results/
 tests/save_files/
+bash/check_smile.sh
+data/subsets/

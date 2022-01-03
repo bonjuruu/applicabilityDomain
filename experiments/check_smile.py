@@ -1,17 +1,16 @@
 import argparse
-import time
+import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from adad.utils import create_dir, to_json
 from rdkit import Chem
-
-from adad.utils import create_dir, time2str
 
 COL_NAME = 'smiles'
 
 
 def check_smile(input, output, column):
-    start = time.process_time()
     df = pd.read_csv(input)
     smiles = df[column].to_list()
     idx_na = []
@@ -21,15 +20,18 @@ def check_smile(input, output, column):
             idx_na.append(i)
     print(f'# of smiles cannot convert: {len(idx_na)}')
     df = df.drop(index=idx_na)
-    df.to_csv(output, index=False)
-    time_elapse = time.process_time() - start
-    print(f'Total run time: {time2str(time_elapse)}')
+    filename = os.path.basename(input)
+    filename = os.path.splitext(filename)[0]
+    df.to_csv(os.path.join(output, filename + '.csv'), index=False)
+    data = {'indices': np.array(idx_na, dtype=int)}
+    print(data)
+    to_json(data, os.path.join(output, filename + '.json'))
 
 
 if __name__ == '__main__':
     """
     Example:
-    python ./experiments/check_smile.py -f ./data/smiles/Ames_smiles.csv -o ./data2/smiles/ames_smiles.csv
+    python ./experiments/check_smile.py -f ./data/smiles/Ames_smiles.csv -o ./data2/smiles
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--filepath', type=str, required=True,
