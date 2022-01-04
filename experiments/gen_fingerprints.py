@@ -14,7 +14,7 @@ COL_NAME = 'smiles'
 
 
 def gen_fp(input, output, method, column):
-    start = time.process_time()
+    start = time.perf_counter()
     df = pd.read_csv(input)
     smiles = df[column].to_list()
     results = []
@@ -27,7 +27,7 @@ def gen_fp(input, output, method, column):
         else:  # method == 'rdkit'
             fp = RDKFingerprint(mol)
         results.append(fp.ToList())
-    time_elapse = time.process_time() - start
+    time_elapse = time.perf_counter() - start
     print(f'Total run time: {time2str(time_elapse)}')
     results = np.array(results, dtype=int)
     assert results.shape[0] == df.shape[0]
