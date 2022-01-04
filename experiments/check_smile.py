@@ -47,6 +47,6 @@ if __name__ == '__main__':
     print(f'  Path: {filepath}')
     print(f'Output: {output}')
     print(f'Column: {column}')
-    create_dir(Path(output).parent)
+    create_dir(Path(output))
 
     check_smile(filepath, output, column)

@@ -5,11 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import AllChem, RDKFingerprint
+from rdkit.Chem import AllChem, MACCSkeys, RDKFingerprint
 
 from adad.utils import create_dir, time2str
 
-FINGER_PRINTS = ['ecfp', 'rdkit']
+FINGER_PRINTS = ['ecfp', 'rdkit', 'maccs']
 COL_NAME = 'smiles'
 
 
@@ -22,6 +22,8 @@ def gen_fp(input, output, method, column):
         mol = Chem.MolFromSmiles(s)
         if method == 'ecfp':
             fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+        elif method == 'maccs':
+            fp = MACCSkeys.GenMACCSKeys(mol)
         else:  # method == 'rdkit'
             fp = RDKFingerprint(mol)
         results.append(fp.ToList())
@@ -35,7 +37,7 @@ def gen_fp(input, output, method, column):
 if __name__ == '__main__':
     """
     Example:
-    python ./experiments/gen_fingerprints.py -f ./data/smiles/Ames_smiles.csv -m ecfp -o ./data/ecfp/ames_ecfp.npy
+    python ./experiments/gen_fingerprints.py -f ./data/smiles/Ames_smiles.csv -m maccs -o ./data/maccs/Ames_maccs.npy
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--filepath', type=str, required=True,

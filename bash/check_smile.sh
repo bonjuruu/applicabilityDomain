@@ -1,7 +1,7 @@
 #!/bin/bash
 
-DATALIST=("Ames" "BBBP" "Cancer" "CYP1A2" "FXa" "hERG" "HIV" "Liver")
+DATALIST=("Ames" "BBBP" "Cancer" "CYP1A2" "hERG" "HIV" "Liver")
 
 for DATA in ${DATALIST[@]}; do
-    python ./experiments/check_smile.py -f ./data/smiles/$DATA\_smiles.csv -o ./data2/smiles
+    python ./experiments/check_smile.py -f ./data/smiles/$DATA\_smiles.csv -o ./data/subsets/smiles
 done
