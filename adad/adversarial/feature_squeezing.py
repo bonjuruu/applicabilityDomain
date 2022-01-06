@@ -21,7 +21,7 @@ class SklearnFeatureSqueezing(AppDomainBase):
     Classifier: classifier
         The classifier that will be used for all descriptors.
     n_discriptors: int
-        Number of discriptors per sample.
+        Number of alternative discriptors.
     clf_params: 
         List of parameters that are used by each classifier.
     """
@@ -35,16 +35,17 @@ class SklearnFeatureSqueezing(AppDomainBase):
 
         self.clfs = []
         for i in range(n_discriptors):
-            self.clfs.append(Classifier(*clf_params[i]))
+            params = clf_params[i]
+            self.clfs.append(Classifier(**params))
 
-    def fit(self, X, y):
+    def fit(self, Xs, y):
         time_start = time.perf_counter()
-        for clf in self.clfs:
-            clf.fit(X, y)
+        for i, clf in enumerate(self.clfs):
+            clf.fit(Xs[i], y)
         time_elapsed = time.perf_counter() - time_start
         logger.info(f'Total training time: {time2str(time_elapsed)}')
 
-    def measure(self, X, *X_alt):
+    def measure(self, X, Xs_alt):
         """Check AD on X.
 
         Parameters
@@ -54,11 +55,13 @@ class SklearnFeatureSqueezing(AppDomainBase):
         X_alt: list of array
             The unlabeled samples that use alternative descriptors
         """
-        assert len(X_alt) == self.n_discriptors, \
+        assert len(Xs_alt) == self.n_discriptors, \
             '# of alternative Xs does not match with # of expected discriptors.'
 
         pred = self.clf.predict(X)
-        pred_alt = -np.ones((self.n_discriptors, len(pred)), dtype=pred.dtype)
+        preds_alt = -np.ones((self.n_discriptors, len(pred)), dtype=pred.dtype)
         for i, clf in enumerate(self.clfs):
-            pred_alt[i] = clf.predict(X)
-        return pred, pred_alt
+            preds_alt[i] = clf.predict(Xs_alt[i])
+        
+        result = np.sum(preds_alt == pred, axis=0) / self.n_discriptors
+        return result
