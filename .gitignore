@@ -158,3 +158,4 @@ tests/results/
 tests/save_files/
 bash/check_smile.sh
 data/subsets/
+demo/magnet_model/
