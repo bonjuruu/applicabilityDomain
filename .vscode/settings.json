@@ -1,7 +1,1 @@
-{
-    "editor.formatOnSave": false,
-    "python.formatting.autopep8Args": [
-        "--ignore",
-        "E402"
-    ]
-}
+{}
