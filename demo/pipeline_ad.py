@@ -16,6 +16,8 @@ from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            sensitivity_specificity)
 from adad.utils import create_dir, to_json, set_seed, time2str
 
+N_ESTIMATORS = 200
+
 
 def plot_ca(df_cum_acc, path_output, dataname, n_cv=5):
     plt.rcParams["font.size"] = 16
@@ -191,6 +193,9 @@ def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
         df_pc[f'{col}_err_rate'] = pd.Series(err_rate, dtype=float)
 
     # Save results
+    path_outputs = os.path.join(path_outputs, f'{Classifier.__name__}_{ApplicabilityDomain.__name__}')
+    create_dir(path_outputs)
+
     # Using the same parameters for all CV
     to_json(clf_params, os.path.join(path_outputs, f'{dataname}_{Classifier.__name__}.json'))
 
@@ -237,11 +242,10 @@ def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
 
 
 if __name__ == '__main__':
-    N_ESTIMATORS = 200
     SEED = np.random.randint(0, 999999)
     set_seed(SEED)
-    print(f'The seed is {SEED}')
 
+    print(f'The seed is {SEED}')
     PATH_ROOT = Path(os.getcwd()).absolute()
     print(PATH_ROOT)
 
@@ -280,8 +284,6 @@ if __name__ == '__main__':
     df = pd.read_csv(path_data)
     cv_train = pd.read_csv(path_idx_train, dtype=pd.Int64Dtype())
     cv_test = pd.read_csv(path_idx_test, dtype=pd.Int64Dtype())
-    path_outputs = os.path.join(path_outputs, f'{RandomForestClassifier.__name__}_{DAIndexGamma.__name__}_jaccard')
-    create_dir(path_outputs)
 
     time_start = time.perf_counter()
     run_pipeline(df, cv_train, cv_test,
