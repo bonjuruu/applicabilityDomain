@@ -1,20 +1,29 @@
+import argparse
+import json
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
 # External
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from adad.utils import create_dir, set_seed, time2str, to_json
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import RocCurveDisplay, auc
 
 # Local
-from adad.distance import DAIndexGamma
+from adad.distance import DAIndexGamma, DAIndexKappa, DAIndexDelta
+from adad.bounding_box import PCABoundingBox
+from adad.probability import ProbabilityClassifier
 from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad,
                            sensitivity_specificity)
-from adad.utils import create_dir, to_json, set_seed, time2str
+
+CLASSIFIER_NAMES = ['rf', 'svm', 'knn']
+AD_NAMES = ['gamma', 'kappa', 'delta', 'boundingbox', 'prob']
 
 
 def plot_ca(df_cum_acc, path_output, dataname, n_cv=5):
@@ -116,7 +125,7 @@ def plot_pc(df, path_output, dataname, n_cv=5):
                     label="$\pm$ 1 std. dev.")
 
     ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 0.6])
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper left")
     ax.set_xlabel('Percentile')
     ax.set_ylabel('Error Rate')
     ax.set_title(f'{dataname} - Predictiveness Curves (PC)')
@@ -143,8 +152,8 @@ def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
     for col in cv_train.columns:
         idx_train = cv_train[col].dropna(axis=0).to_numpy().astype(int)
         idx_test = cv_test[col].dropna(axis=0).to_numpy().astype(int)
-        assert len(idx_train) + len(idx_test) == n_samples
-        assert not np.all(np.isin(idx_train, idx_test))
+        assert len(idx_train) + len(idx_test) == n_samples, 'Indices does not match samples!'
+        assert not np.all(np.isin(idx_train, idx_test)), 'Training set and test set have overlap!'
 
         X_train, X_test = X[idx_train], X[idx_test]
         y_train, y_test = y[idx_train], y[idx_test]
@@ -185,6 +194,7 @@ def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
 
         auc_roc = auc(fpr, tpr)
         aucs.append(auc_roc)
+        print(f'AUC: {auc_roc:.3f} Permutation AUC: {auc_significance:.3f}')
 
         percentile, err_rate = predictiveness_curves(y_test, y_pred, dist_measure, n_quantiles=50)
         df_pc[f'{col}_percentile'] = pd.Series(percentile, dtype=float)
@@ -236,60 +246,128 @@ def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
     plot_pc(df_pc, path_pc_plot, dataname)
 
 
-if __name__ == '__main__':
-    N_ESTIMATORS = 200
-    SEED = np.random.randint(0, 999999)
-    set_seed(SEED)
-    print(f'The seed is {SEED}')
+def get_clf(clfname):
+    assert clfname in CLASSIFIER_NAMES, f'Received classifier: {clfname}'
+    if clfname == 'rf':
+        clf = RandomForestClassifier
+    elif clfname == 'svm':
+        clf = SVC
+    elif clfname == 'knn':
+        clf = KNeighborsClassifier
+    else:
+        clf = None
+    return clf
 
-    PATH_ROOT = Path(os.getcwd()).absolute()
-    print(PATH_ROOT)
 
-    path_maccs = os.path.join(PATH_ROOT, 'data', 'maccs')
+def get_ad(adname):
+    assert adname in AD_NAMES, f'Received AD: {adname}'
+    if adname == 'gamma':
+        ad = DAIndexGamma
+    elif adname == 'kappa':
+        ad = DAIndexKappa
+    elif adname == 'delta':
+        ad = DAIndexDelta
+    elif adname == 'boundingbox':
+        ad = PCABoundingBox
+    elif adname == 'prob':
+        ad = ProbabilityClassifier
+    else:
+        ad = None
+    return ad
+
+
+def run_exp(path_input,
+            path_output,
+            dataname,
+            clfname,
+            clf_params,
+            adname,
+            ad_params,
+            random_state):
+    if random_state is None:
+        random_state = np.random.randint(0, 999999)
+    set_seed(random_state)
+    print(f'Set random_state to: {random_state}')
+
+    Classifier = get_clf(clfname)
+    AD = get_ad(adname)
+
+    path_outputs = os.path.join(path_output, f'{Classifier.__name__}_{AD.__name__}')
+    create_dir(path_outputs)
+    print(f'Save results to: {path_outputs}')
+    path_random_state = os.path.join(path_outputs, f'{dataname}_random_state.json')
+    to_json({'random_state': random_state}, path_random_state)
+
+    # Load data
+    path_maccs = os.path.join(path_input, 'maccs')
     path_maccs_files = np.sort([os.path.join(path_maccs, file) for file in os.listdir(path_maccs) if file[-4:] == '.csv'])
-    print(path_maccs_files)
+    path_data = [file for file in path_maccs_files if dataname in file][0]
+    df = pd.read_csv(path_data)
 
-    path_cv = os.path.join(PATH_ROOT, 'data', 'cv')
+    # Load Cross-validation indices
+    path_cv = os.path.join(path_input, 'cv')
     path_cv_train = np.sort([os.path.join(path_cv, file) for file in os.listdir(
         path_cv) if file[-13:] == '_cv_train.csv'])
     path_cv_test = np.sort([os.path.join(path_cv, file) for file in os.listdir(
         path_cv) if file[-12:] == '_cv_test.csv'])
-    print('Train:')
-    print(path_cv_train)
-    print('Test:')
-    print(path_cv_test)
-
-    datanames = [Path(f).stem.split('_')[0] for f in path_maccs_files]
-    print(datanames)
-
-    for i in range(len(datanames)):
-        dataname = datanames[i]
-        n_name = len(dataname)
-        assert os.path.basename(path_maccs_files[i])[:n_name] == dataname
-        assert os.path.basename(path_cv_train[i])[:n_name] == dataname
-        assert os.path.basename(path_cv_test[i])[:n_name] == dataname
-
-    path_outputs = os.path.join(PATH_ROOT, 'results')
-
-    i = 0
-    dataname = datanames[i]
-    path_data = path_maccs_files[i]
-    path_idx_train = path_cv_train[i]
-    path_idx_test = path_cv_test[i]
-
-    df = pd.read_csv(path_data)
+    path_idx_train = [file for file in path_cv_train if dataname in file][0]
+    path_idx_test = [file for file in path_cv_test if dataname in file][0]
     cv_train = pd.read_csv(path_idx_train, dtype=pd.Int64Dtype())
     cv_test = pd.read_csv(path_idx_test, dtype=pd.Int64Dtype())
-    path_outputs = os.path.join(path_outputs, f'{RandomForestClassifier.__name__}_{DAIndexGamma.__name__}_jaccard')
-    create_dir(path_outputs)
+
+    # RF and SVM need to set random_state
+    if clfname == 'rf' or clfname == 'svm':
+        clf_params['random_state'] = random_state
+
+    # BoundingBox requires random_state
+    if adname == 'boundingbox':
+        ad_params['random_state'] = random_state
 
     time_start = time.perf_counter()
     run_pipeline(df, cv_train, cv_test,
-                 RandomForestClassifier,
-                 {'n_estimators': N_ESTIMATORS, 'random_state': SEED},
-                 DAIndexGamma,
-                 {'dist_metric': 'jaccard'},
+                 Classifier,
+                 clf_params,
+                 AD,
+                 ad_params,
                  dataname,
                  path_outputs)
     time_elapsed = time.perf_counter() - time_start
     print(f'Total run time: {time2str(time_elapsed)}')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input', type=str, default='./data',
+                        help='Input file path.')
+    parser.add_argument('-o', '--output', type=str, default='./results',
+                        help='Output file path.')
+    parser.add_argument('-d', '--data', type=str, required=True,
+                        help='Dataname.')
+    parser.add_argument('--clf', type=str, required=True,
+                        help='Classifier name.')
+    parser.add_argument('--clfArg', type=str,
+                        help='Classifier\'s parameters.')
+    parser.add_argument('--ad', type=str, required=True,
+                        help='Applicability Domain name.')
+    parser.add_argument('--adArg', type=str, required=True,
+                        help='AD\'s parameters.')
+    parser.add_argument('-r', '--random_state', type=int, help='Random state.')
+    args = parser.parse_args()
+    print('Received args:', args)
+    path_input = Path(args.input).absolute()
+    path_output = Path(args.output).absolute()
+    dataname = args.data
+    clfname = args.clf
+    clf_params = json.loads(args.clfArg)
+    adname = args.ad
+    ad_params = json.loads(args.adArg)
+    random_state = args.random_state
+
+    run_exp(path_input,
+            path_output,
+            dataname,
+            clfname,
+            clf_params,
+            adname,
+            ad_params,
+            random_state)
