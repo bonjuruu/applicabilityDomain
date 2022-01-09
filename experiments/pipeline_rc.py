@@ -8,35 +8,33 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import auc
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 
 # Local
-from adad.bounding_box import PCABoundingBox
-from adad.distance import DAIndexDelta, DAIndexGamma, DAIndexKappa
+from adad.adversarial.region_based_classifier import SklearnRegionBasedClassifier
 from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad,
                            sensitivity_specificity)
 from adad.plot import plot_ca, plot_pc, plot_roc
-from adad.probability import ProbabilityClassifier
 from adad.torch_utils import NNClassifier
-from adad.utils import create_dir, set_seed, time2str, to_json
+from adad.utils import (create_dir, drop_redundant_col, get_range, set_seed,
+                        time2str, to_json)
 
-AD_NAMES = ['gamma', 'kappa', 'delta', 'boundingbox', 'prob']
+CLASSIFIER_NAMES = ['rf', 'svm', 'knn', 'nn']
+
+# Parameters for ReginBasedClassifier
+R_MIN = 0.01
+R_MAX = 0.20
+STEP_SIZE = 1
+EPS = 0.01
+SAMPLE_SIZE = 200
 
 
-def run_pipeline_nn(dataset,
-                    cv_train,
-                    cv_test,
-                    ApplicabilityDomain,
-                    ad_params,
-                    dataname,
-                    path_outputs):
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
-        print('Running on CPU!')
-
+def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,
+                 dataname, path_outputs):
     y = dataset['y'].to_numpy().astype(int)
     X = dataset.drop(['y'], axis=1).to_numpy().astype(np.float32)
     n_samples = X.shape[0]
@@ -51,6 +49,18 @@ def run_pipeline_nn(dataset,
     df_cum_acc = pd.DataFrame()
     df_roc = pd.DataFrame()
     df_pc = pd.DataFrame()
+    path_ad = os.path.join(path_outputs, f'{dataname}_rc', 'rc_params.json')
+
+    if Classifier.__name__ == NNClassifier.__name__:
+        # To handle # of features changes after dropping empty columns
+        clf_params['input_dim'] = X.shape[1]
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+            print('Running on CPU!')
+        clf_params['device'] = device
+
     for col in cv_train.columns:
         idx_train = cv_train[col].dropna(axis=0).to_numpy().astype(int)
         idx_test = cv_test[col].dropna(axis=0).to_numpy().astype(int)
@@ -61,10 +71,10 @@ def run_pipeline_nn(dataset,
         y_train, y_test = y[idx_train], y[idx_test]
 
         # Train classifier
-        clf = NNClassifier(device=device)
+        clf = Classifier(**clf_params)
         clf.fit(X_train, y_train)
-        clf.save(os.path.join(path_outputs, f'{dataname}_{col}_NeuralNet'))
-
+        if Classifier.__name__ == NNClassifier.__name__:
+            clf.save(os.path.join(path_outputs, f'{dataname}_{col}_NeuralNet'))
         y_pred = clf.predict(X_test)
         acc_train = clf.score(X_train, y_train)
         accs_train.append(acc_train)
@@ -73,11 +83,28 @@ def run_pipeline_nn(dataset,
         print('Accuracy Train: {:.2f}% Test: {:.2f}%'.format(acc_train * 100, acc_test * 100))
 
         # Train Applicability Domain
-        ad_params['clf'] = clf
-        ad = ApplicabilityDomain(**ad_params)
-        ad.fit(X_train, y_train)
+        x_min, x_max = get_range(X_train)
+        ad = SklearnRegionBasedClassifier(
+            clf,
+            sample_size=SAMPLE_SIZE,
+            x_min=x_min,
+            x_max=x_max,
+            r_min=R_MIN,
+            r_max=R_MAX,
+            step_size=STEP_SIZE,
+            eps=EPS,
+            data_type='discrete',
+            verbose=0,  # Set to 1 for debugging
+        )
+        if os.path.exists(path_ad):
+            ad.load(Path(path_ad).parent)
+        else:
+            ad.fit(X_train, y_train)
+            ad.save(Path(path_ad).parent)
 
         dist_measure = ad.measure(X_test)
+        # RC requires inverse DM!
+        dist_measure = 1. / (dist_measure + 1e-6)
         df_dm[col] = pd.Series(dist_measure, dtype=float)
 
         sensitivity, specificity = sensitivity_specificity(y_test, y_pred)
@@ -103,9 +130,11 @@ def run_pipeline_nn(dataset,
         df_pc[f'{col}_percentile'] = pd.Series(percentile, dtype=float)
         df_pc[f'{col}_err_rate'] = pd.Series(err_rate, dtype=float)
 
-    # Save AD
-    ad_params.pop('clf', None)
-    to_json(ad_params, os.path.join(path_outputs, f'{dataname}_{ApplicabilityDomain.__name__}.json'))
+    # Save results
+    if Classifier.__name__ != NNClassifier.__name__:
+        # Using the same parameters for all CV
+        clf_params = clf.get_params()
+        to_json(clf_params, os.path.join(path_outputs, f'{dataname}_{Classifier.__name__}.json'))
 
     # Save scores
     data1 = {
@@ -145,37 +174,35 @@ def run_pipeline_nn(dataset,
     plot_pc(df_pc, path_pc_plot, dataname)
 
 
-def get_ad(adname):
-    assert adname in AD_NAMES, f'Received AD: {adname}'
-    if adname == 'gamma':
-        ad = DAIndexGamma
-    elif adname == 'kappa':
-        ad = DAIndexKappa
-    elif adname == 'delta':
-        ad = DAIndexDelta
-    elif adname == 'boundingbox':
-        ad = PCABoundingBox
-    elif adname == 'prob':
-        ad = ProbabilityClassifier
+def get_clf(clfname):
+    assert clfname in CLASSIFIER_NAMES, f'Received classifier: {clfname}'
+    if clfname == 'rf':
+        clf = RandomForestClassifier
+    elif clfname == 'svm':
+        clf = SVC
+    elif clfname == 'knn':
+        clf = KNeighborsClassifier
+    elif clfname == 'nn':
+        clf = NNClassifier
     else:
-        ad = None
-    return ad
+        clf = None
+    return clf
 
 
 def run_exp(path_input,
             path_output,
             dataname,
-            adname,
-            ad_params,
+            clfname,
+            clf_params,
             random_state):
     if random_state is None:
         random_state = np.random.randint(0, 999999)
     set_seed(random_state)
     print(f'Set random_state to: {random_state}')
 
-    AD = get_ad(adname)
+    Classifier = get_clf(clfname)
 
-    path_outputs = os.path.join(path_output, f'{NNClassifier.__name__}_{AD.__name__}')
+    path_outputs = os.path.join(path_output, f'{Classifier.__name__}_{SklearnRegionBasedClassifier.__name__}')
     create_dir(path_outputs)
     print(f'Save results to: {path_outputs}')
     path_random_state = os.path.join(path_outputs, f'{dataname}_random_state.json')
@@ -186,6 +213,9 @@ def run_exp(path_input,
     path_maccs_files = np.sort([os.path.join(path_maccs, file) for file in os.listdir(path_maccs) if file[-4:] == '.csv'])
     path_data = [file for file in path_maccs_files if dataname in file][0]
     df = pd.read_csv(path_data)
+
+    # Drop columns that contains only 0
+    df = drop_redundant_col(df)
 
     # Load Cross-validation indices
     path_cv = os.path.join(path_input, 'cv')
@@ -198,16 +228,16 @@ def run_exp(path_input,
     cv_train = pd.read_csv(path_idx_train, dtype=pd.Int64Dtype())
     cv_test = pd.read_csv(path_idx_test, dtype=pd.Int64Dtype())
 
-    # BoundingBox requires random_state
-    if adname == 'boundingbox':
-        ad_params['random_state'] = random_state
+    # RF and SVM need to set random_state
+    if clfname == 'rf' or clfname == 'svm':
+        clf_params['random_state'] = random_state
 
     time_start = time.perf_counter()
-    run_pipeline_nn(df, cv_train, cv_test,
-                    AD,
-                    ad_params,
-                    dataname,
-                    path_outputs)
+    run_pipeline(df, cv_train, cv_test,
+                 Classifier,
+                 clf_params,
+                 dataname,
+                 path_outputs)
     time_elapsed = time.perf_counter() - time_start
     print(f'Total run time: {time2str(time_elapsed)}')
 
@@ -220,23 +250,23 @@ if __name__ == '__main__':
                         help='Output file path.')
     parser.add_argument('-d', '--data', type=str, required=True,
                         help='Dataname.')
-    parser.add_argument('--ad', type=str, required=True,
-                        help='Applicability Domain name.')
-    parser.add_argument('--adArg', type=str, required=True,
-                        help='AD\'s parameters.')
+    parser.add_argument('--clf', type=str, required=True,
+                        help='Classifier name.')
+    parser.add_argument('--clfArg', type=str,
+                        help='Classifier\'s parameters.')
     parser.add_argument('-r', '--random_state', type=int, help='Random state.')
     args = parser.parse_args()
     print('Received args:', args)
     path_input = Path(args.input).absolute()
     path_output = Path(args.output).absolute()
     dataname = args.data
-    adname = args.ad
-    ad_params = json.loads(args.adArg)
+    clfname = args.clf
+    clf_params = json.loads(args.clfArg)
     random_state = args.random_state
 
     run_exp(path_input,
             path_output,
             dataname,
-            adname,
-            ad_params,
+            clfname,
+            clf_params,
             random_state)

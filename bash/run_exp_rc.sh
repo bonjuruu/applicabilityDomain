@@ -1,0 +1,17 @@
+#!/bin/bash
+
+DATALIST=("Ames" "BBBP" "Cancer" "CYP1A2" "hERG" "HIV" "Liver")
+CLASSIFIERS=("rf" "svm" "knn" "nn")
+CLF_ARGS=("{\"n_estimators\": 200, \"n_jobs\": -1}" "{\"C\": 10}" "{\"n_neighbors\": 5, \"n_jobs\": -1}" "{\"batch_size\": 256}")
+
+# Example:
+# python ./experiments/pipeline_rc.py -d Ames --clf svm --clfArg "{\"C\": 10, \"probability\": true}"
+# python ./experiments/pipeline_rc.py -d Ames --clf nn --clfArg "{\"batch_size\": 256}"
+
+for DATA in ${DATALIST[@]}; do
+    for ((I=0; I<${#CLASSIFIERS[@]}; I++)); do
+        python ./experiments/pipeline_rc.py -d $DATA --clf ${CLASSIFIERS[I]} --clfArg "${CLF_ARGS[I]}"
+    done
+done 
+
+echo "Done! Program has completed."

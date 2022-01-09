@@ -1,13 +1,14 @@
 """Region-based classification for PyTorch and scikit-learn.
 """
 import logging
+import os
 import time
 
 import numpy as np
 from tqdm import tqdm
 
 from adad.app_domain_base import AppDomainBase
-from adad.utils import time2str
+from adad.utils import create_dir, open_json, time2str, to_json
 
 logger = logging.getLogger(__name__)
 
@@ -201,3 +202,34 @@ class SklearnRegionBasedClassifier(AppDomainBase):
         # Build a histogram
         bincount = np.bincount(pred_rng, minlength=self.n_class).astype(int)
         return bincount
+
+    def save(self, path):
+        params = {
+            'sample_size': self.sample_size,
+            'x_min': self.x_min,
+            'x_max': self.x_max,
+            'r_min': self.r_min,
+            'r_max': self.r_max,
+            'step_size': self.step_size,
+            'eps': self.eps,
+            'data_type': self.data_type,
+            'verbose': self.verbose,
+            'r': self.r,
+            'n_class': self.n_class,
+        }
+        create_dir(path)
+        to_json(params, os.path.join(path, 'rc_params.json'))
+
+    def load(self, path):
+        params = open_json(os.path.join(path, 'rc_params.json'))
+        self.sample_size = params['sample_size']
+        self.x_min = params['x_min']
+        self.x_max = params['x_max']
+        self.r_min = params['r_min']
+        self.r_max = params['r_max']
+        self.step_size = params['step_size']
+        self.eps = params['eps']
+        self.data_type = params['data_type']
+        self.verbose = params['verbose']
+        self.r = params['r']
+        self.n_class = params['n_class']

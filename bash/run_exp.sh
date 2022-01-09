@@ -2,7 +2,7 @@
 
 DATALIST=("Ames" "BBBP" "Cancer" "CYP1A2" "hERG" "HIV" "Liver")
 CLASSIFIERS=("rf" "svm" "knn")
-CLF_ARGS=("{\"n_estimators\": 200}" "{\"C\": 10, \"probability\": true}" "{\"n_neighbors\": 5}")
+CLF_ARGS=("{\"n_estimators\": 200, \"n_jobs\": -1}" "{\"C\": 10, \"probability\": true}" "{\"n_neighbors\": 5, \"n_jobs\": -1}")
 ADS=("gamma" "kappa" "delta" "boundingbox" "prob")
 AD_ARGS=("{\"dist_metric\": \"jaccard\"}" "{\"dist_metric\": \"jaccard\"}" "{\"dist_metric\": \"jaccard\"}" "{\"n_components\": 5}" "{}")
 
