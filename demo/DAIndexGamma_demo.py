@@ -273,7 +273,7 @@ if __name__ == '__main__':
         assert os.path.basename(path_cv_train[i])[:n_name] == dataname
         assert os.path.basename(path_cv_test[i])[:n_name] == dataname
 
-    path_outputs = os.path.join(PATH_ROOT, 'results')
+    path_outputs = os.path.join(PATH_ROOT, 'demo')
 
     i = 0
     dataname = datanames[i]

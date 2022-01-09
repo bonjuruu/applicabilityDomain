@@ -161,3 +161,6 @@ data/subsets/
 demo/magnet_model/
 results/
 .vscode/settings.json
+demo/*/*.pdf
+demo/*/*.json
+demo/*/*.csv
