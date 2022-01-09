@@ -5,14 +5,10 @@ import time
 from pathlib import Path
 
 # External
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from sklearn.metrics import RocCurveDisplay, auc
-from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import auc
 
 # Local
 from adad.bounding_box import PCABoundingBox
@@ -20,212 +16,12 @@ from adad.distance import DAIndexDelta, DAIndexGamma, DAIndexKappa
 from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad,
                            sensitivity_specificity)
+from adad.plot import plot_ca, plot_pc, plot_roc
 from adad.probability import ProbabilityClassifier
-from adad.torch_utils import evaluate, predict, predict_proba, train_model
-from adad.utils import create_dir, open_json, set_seed, time2str, to_json
+from adad.torch_utils import NNClassifier
+from adad.utils import create_dir, set_seed, time2str, to_json
 
 AD_NAMES = ['gamma', 'kappa', 'delta', 'boundingbox', 'prob']
-
-
-class NeuralNet(nn.Module):
-    """A simple fullly-connected neural network with 1 hidden-layer"""
-
-    def __init__(self, input_dim, hidden_dim=512, output_dim=2):
-        super(NeuralNet, self).__init__()
-
-        self.layer1 = nn.Linear(input_dim, hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer3 = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        x = self.layer3(x)
-        return x
-
-
-class NNClassifier:
-    def __init__(self,
-                 input_dim=167,
-                 hidden_dim=512,
-                 output_dim=2,
-                 batch_size=128,
-                 max_epochs=300,
-                 lr=1e-3,
-                 device='cuda'):
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
-        self.batch_size = batch_size
-        self.max_epochs = max_epochs
-        self.lr = lr
-        self.device = torch.device(device)
-
-        self.clf = NeuralNet(input_dim, hidden_dim, output_dim).to(self.device)
-        self.loss_fn = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.clf.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
-
-    def fit(self, X, y):
-        dataset = TensorDataset(
-            torch.from_numpy(X).type(torch.float32),
-            torch.from_numpy(y).type(torch.int64)
-        )
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        train_model(self.clf, dataloader, self.optimizer, self.loss_fn,
-                    self.device, self.max_epochs)
-
-    def predict(self, X):
-        return predict(X, self.clf, self.device, self.batch_size)
-
-    def predict_proba(self, X):
-        return predict_proba(X, self.clf, self.device, self.batch_size)
-
-    def score(self, X, y):
-        dataset = TensorDataset(
-            torch.from_numpy(X).type(torch.float32),
-            torch.from_numpy(y).type(torch.int64)
-        )
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        acc, _ = evaluate(dataloader, self.clf, self.loss_fn, self.device)
-        return acc
-
-    def save(self, path):
-        create_dir(path)
-        torch.save(self.clf.state_dict(), os.path.join(path, 'NeuralNet.torch'))
-        params = {
-            'input_dim': self.input_dim,
-            'hidden_dim': self.hidden_dim,
-            'output_dim': self.output_dim,
-            'batch_size': self.batch_size,
-            'max_epochs': self.max_epochs,
-            'lr': self.lr,
-            'device': str(self.device),
-        }
-        to_json(params, os.path.join(path, 'NNClassifier.json'))
-
-    def load(self, path):
-        params = open_json(os.path.join(path, 'NNClassifier.json'))
-        self.input_dim = params['input_dim']
-        self.hidden_dim = params['hidden_dim']
-        self.output_dim = params['output_dim']
-        self.batch_size = params['batch_size']
-        self.max_epochs = params['max_epochs']
-        self.lr = params['lr']
-        self.device = torch.device(params['device'])
-        self.clf.load_state_dict(
-            torch.load(
-                os.path.join(path, 'NeuralNet.torch'),
-                map_location=self.device
-            )
-        )
-        self.optimizer = torch.optim.SGD(self.clf.parameters(), lr=self.lr, momentum=0.9, weight_decay=1e-4)
-
-
-def plot_ca(df_cum_acc, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    mean_x = np.linspace(0, 1, 100)
-    ys = []
-    for i in range(1, n_cv + 1):
-        x = df_cum_acc[f'cv{i}_rate']
-        y = df_cum_acc[f'cv{i}_acc']
-        ax.plot(x, y, alpha=0.3, lw=1, label=f'Fold{i}')
-
-        interp_acc = np.interp(mean_x, x, y)
-        ys.append(interp_acc)
-
-    # Draw mean value
-    mean_y = np.mean(ys, axis=0)
-    ax.plot(mean_x, mean_y, color='b', lw=2, alpha=0.8, label='Mean')
-
-    # Fill standard error area
-    std_y = np.std(ys, axis=0)
-    y_upper = np.minimum(mean_y + std_y, 1)
-    y_lower = np.maximum(mean_y - std_y, 0)
-    ax.fill_between(mean_x, y_lower, y_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[0.6, 1.01])
-    ax.legend(loc="lower right")
-    ax.set_xlabel('Cumulative Rate')
-    ax.set_ylabel('Cumulative Accuracy (%)')
-    ax.set_title(f'{dataname} - Cumulative Accuracy')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
-
-
-def plot_roc(df_roc, roc_aucs, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    tprs = []
-    aucs = []
-    mean_fpr = np.linspace(0, 1, 100)
-    # Draw each ROC curve
-    for i in range(1, n_cv + 1):
-        fpr = df_roc[f'cv{i}_fpr']
-        tpr = df_roc[f'cv{i}_tpr']
-        roc_auc = roc_aucs[i - 1]
-        display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-        display.plot(ax=ax, alpha=0.3, lw=1, label=f"ROC Fold{i} (AUC={roc_auc:.2f})")
-
-        interp_tpr = np.interp(mean_fpr, fpr, tpr)
-        interp_tpr[0] = 0.0
-        tprs.append(interp_tpr)
-        aucs.append(roc_auc)
-
-    # Draw mean value
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    std_auc = np.std(aucs)
-    ax.plot(mean_fpr, mean_tpr, color='b', lw=2, alpha=0.8,
-            label=f"Mean ROC (AUC = {mean_auc:.2f} $\pm$ {std_auc:.2f})")
-
-    # Fill standard error area
-    std_tpr = np.std(tprs, axis=0)
-    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
-    ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 1.01])
-    ax.legend(loc="lower right")
-    ax.set_title(f'{dataname} - ROC Curve')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
-
-
-def plot_pc(df, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    mean_x = np.linspace(0, 1, 100)
-    ys = []
-    for i in range(1, n_cv + 1):
-        x = df[f'cv{i}_percentile']
-        y = df[f'cv{i}_err_rate']
-        ax.plot(x, y, alpha=0.3, lw=1, label=f'Fold{i}')
-
-        interp_acc = np.interp(mean_x, x, y)
-        ys.append(interp_acc)
-
-    # Draw mean value
-    mean_acc = np.mean(ys, axis=0)
-    ax.plot(mean_x, mean_acc, color='b', lw=2, alpha=0.8, label='Mean')
-
-    # Fill standard error area
-    std_y = np.std(ys, axis=0)
-    y_upper = np.minimum(mean_acc + std_y, 1)
-    y_lower = np.maximum(mean_acc - std_y, 0)
-    ax.fill_between(mean_x, y_lower, y_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 0.6])
-    ax.legend(loc="upper left")
-    ax.set_xlabel('Percentile')
-    ax.set_ylabel('Error Rate')
-    ax.set_title(f'{dataname} - Predictiveness Curves (PC)')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
 
 
 def run_pipeline_nn(dataset,

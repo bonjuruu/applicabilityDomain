@@ -1,5 +1,11 @@
+import os
+
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+
+from .utils import create_dir, open_json, to_json
 
 
 class EarlyStopping:
@@ -136,3 +142,100 @@ def predict_proba(X, model, device, batch_size=128):
             start = end
 
     return pred.numpy()
+
+
+class NeuralNet(nn.Module):
+    """A simple fullly-connected neural network with 1 hidden-layer"""
+
+    def __init__(self, input_dim, hidden_dim=512, output_dim=2):
+        super(NeuralNet, self).__init__()
+
+        self.layer1 = nn.Linear(input_dim, hidden_dim)
+        self.layer2 = nn.Linear(hidden_dim, hidden_dim)
+        self.layer3 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        x = self.layer3(x)
+        return x
+
+
+class NNClassifier:
+    def __init__(self,
+                 input_dim=167,
+                 hidden_dim=512,
+                 output_dim=2,
+                 batch_size=128,
+                 max_epochs=300,
+                 lr=1e-3,
+                 device='cuda'):
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.batch_size = batch_size
+        self.max_epochs = max_epochs
+        self.lr = lr
+        self.device = torch.device(device)
+
+        self.clf = NeuralNet(input_dim, hidden_dim, output_dim).to(self.device)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.SGD(self.clf.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+
+    def fit(self, X, y):
+        dataset = TensorDataset(
+            torch.from_numpy(X).type(torch.float32),
+            torch.from_numpy(y).type(torch.int64)
+        )
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        train_model(self.clf, dataloader, self.optimizer, self.loss_fn,
+                    self.device, self.max_epochs)
+
+    def predict(self, X):
+        return predict(X, self.clf, self.device, self.batch_size)
+
+    def predict_proba(self, X):
+        return predict_proba(X, self.clf, self.device, self.batch_size)
+
+    def score(self, X, y):
+        dataset = TensorDataset(
+            torch.from_numpy(X).type(torch.float32),
+            torch.from_numpy(y).type(torch.int64)
+        )
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        acc, _ = evaluate(dataloader, self.clf, self.loss_fn, self.device)
+        return acc
+
+    def save(self, path):
+        create_dir(path)
+        torch.save(self.clf.state_dict(), os.path.join(path, 'NeuralNet.torch'))
+        params = {
+            'input_dim': self.input_dim,
+            'hidden_dim': self.hidden_dim,
+            'output_dim': self.output_dim,
+            'batch_size': self.batch_size,
+            'max_epochs': self.max_epochs,
+            'lr': self.lr,
+            'device': str(self.device),
+        }
+        to_json(params, os.path.join(path, 'NNClassifier.json'))
+
+    def load(self, path):
+        params = open_json(os.path.join(path, 'NNClassifier.json'))
+        self.input_dim = params['input_dim']
+        self.hidden_dim = params['hidden_dim']
+        self.output_dim = params['output_dim']
+        self.batch_size = params['batch_size']
+        self.max_epochs = params['max_epochs']
+        self.lr = params['lr']
+        self.device = torch.device(params['device'])
+        self.clf.load_state_dict(
+            torch.load(
+                os.path.join(path, 'NeuralNet.torch'),
+                map_location=self.device
+            )
+        )
+        self.optimizer = torch.optim.SGD(self.clf.parameters(),
+                                         lr=self.lr,
+                                         momentum=0.9,
+                                         weight_decay=1e-4)

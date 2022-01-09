@@ -73,60 +73,6 @@ def roc_ad(y_true, y_pred, dist_measure):
     return fpr, tpr
 
 
-def plot_roc(fprs, tprs, legend, path=None, title=None, fontsize=14, figsize=(8, 8)):
-    """Plot and save ROC curve for multiple models for comparision. 
-
-    Parameters:
-    -----------
-    fprs: tuple of list
-        A tuple of False Positive Rates
-    tprs: tuple of list
-        A tuple of True Positive Rates
-    legend: list
-    path: string, default=None
-        Path to save ROC curve. If it's None, then no figure will be saved.
-    title: string, default=None
-        Title for the figure
-    fontsize: int
-        Font size for graph
-    figsize: tuple, default=(8, 8)
-        (width, height) of the size of the graph
-    """
-    n_models = len(fprs)
-    assert n_models == len(tprs), 'Input pairs should have same length.'
-    assert n_models == len(legend), \
-        "The plot's legend should have same length as the input pairs"
-
-    plt.rcParams["font.size"] = fontsize
-    _, ax = plt.subplots(figsize=figsize)
-    fprs = list(fprs)
-    tprs = list(tprs)
-    legend = list(legend)
-    # Adding plot for each model
-    for i in range(n_models):
-        fpr = fprs[i]
-        tpr = tprs[i]
-        roc_auc = auc(fpr, tpr)
-        RocCurveDisplay(
-            fpr=fpr,
-            tpr=tpr,
-            roc_auc=roc_auc,
-            estimator_name=legend[i]
-        ).plot(ax=ax)
-    if title is not None:
-        ax.set_title(title)
-    plt.tight_layout()
-    # Only display the plot
-    if path is None:
-        plt.show()
-    else:
-        # Create new directory when it doesn't exist
-        path_parent = Path(path).absolute().parent
-        if not os.path.exists(path_parent):
-            os.makedirs(path_parent)
-        plt.savefig(path, dpi=300)
-
-
 def permutation_auc(y_true, y_pred, dist_measure, n_permutation=10000):
     """Computing randomized AUC value via permutation tests. This AUC result 
     indicates the baseline of AUC when distance measures are assigned to random

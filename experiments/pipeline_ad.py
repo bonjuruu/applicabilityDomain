@@ -5,132 +5,25 @@ import time
 from pathlib import Path
 
 # External
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from adad.utils import create_dir, set_seed, time2str, to_json
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.metrics import auc
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import RocCurveDisplay, auc
+from sklearn.svm import SVC
 
 # Local
-from adad.distance import DAIndexGamma, DAIndexKappa, DAIndexDelta
 from adad.bounding_box import PCABoundingBox
-from adad.probability import ProbabilityClassifier
+from adad.distance import DAIndexDelta, DAIndexGamma, DAIndexKappa
 from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad,
                            sensitivity_specificity)
+from adad.plot import plot_ca, plot_pc, plot_roc
+from adad.probability import ProbabilityClassifier
+from adad.utils import create_dir, set_seed, time2str, to_json
 
 CLASSIFIER_NAMES = ['rf', 'svm', 'knn']
 AD_NAMES = ['gamma', 'kappa', 'delta', 'boundingbox', 'prob']
-
-
-def plot_ca(df_cum_acc, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    mean_x = np.linspace(0, 1, 100)
-    ys = []
-    for i in range(1, n_cv + 1):
-        x = df_cum_acc[f'cv{i}_rate']
-        y = df_cum_acc[f'cv{i}_acc']
-        ax.plot(x, y, alpha=0.3, lw=1, label=f'Fold{i}')
-
-        interp_acc = np.interp(mean_x, x, y)
-        ys.append(interp_acc)
-
-    # Draw mean value
-    mean_y = np.mean(ys, axis=0)
-    ax.plot(mean_x, mean_y, color='b', lw=2, alpha=0.8, label='Mean')
-
-    # Fill standard error area
-    std_y = np.std(ys, axis=0)
-    y_upper = np.minimum(mean_y + std_y, 1)
-    y_lower = np.maximum(mean_y - std_y, 0)
-    ax.fill_between(mean_x, y_lower, y_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[0.6, 1.01])
-    ax.legend(loc="lower right")
-    ax.set_xlabel('Cumulative Rate')
-    ax.set_ylabel('Cumulative Accuracy (%)')
-    ax.set_title(f'{dataname} - Cumulative Accuracy')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
-
-
-def plot_roc(df_roc, roc_aucs, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    tprs = []
-    aucs = []
-    mean_fpr = np.linspace(0, 1, 100)
-    # Draw each ROC curve
-    for i in range(1, n_cv + 1):
-        fpr = df_roc[f'cv{i}_fpr']
-        tpr = df_roc[f'cv{i}_tpr']
-        roc_auc = roc_aucs[i - 1]
-        display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-        display.plot(ax=ax, alpha=0.3, lw=1, label=f"ROC Fold{i} (AUC={roc_auc:.2f})")
-
-        interp_tpr = np.interp(mean_fpr, fpr, tpr)
-        interp_tpr[0] = 0.0
-        tprs.append(interp_tpr)
-        aucs.append(roc_auc)
-
-    # Draw mean value
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    std_auc = np.std(aucs)
-    ax.plot(mean_fpr, mean_tpr, color='b', lw=2, alpha=0.8,
-            label=f"Mean ROC (AUC = {mean_auc:.2f} $\pm$ {std_auc:.2f})")
-
-    # Fill standard error area
-    std_tpr = np.std(tprs, axis=0)
-    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
-    ax.fill_between(mean_fpr, tprs_lower, tprs_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 1.01])
-    ax.legend(loc="lower right")
-    ax.set_title(f'{dataname} - ROC Curve')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
-
-
-def plot_pc(df, path_output, dataname, n_cv=5):
-    plt.rcParams["font.size"] = 16
-    fig, ax = plt.subplots(figsize=(8, 8))
-    mean_x = np.linspace(0, 1, 100)
-    ys = []
-    for i in range(1, n_cv + 1):
-        x = df[f'cv{i}_percentile']
-        y = df[f'cv{i}_err_rate']
-        ax.plot(x, y, alpha=0.3, lw=1, label=f'Fold{i}')
-
-        interp_acc = np.interp(mean_x, x, y)
-        ys.append(interp_acc)
-
-    # Draw mean value
-    mean_acc = np.mean(ys, axis=0)
-    ax.plot(mean_x, mean_acc, color='b', lw=2, alpha=0.8, label='Mean')
-
-    # Fill standard error area
-    std_y = np.std(ys, axis=0)
-    y_upper = np.minimum(mean_acc + std_y, 1)
-    y_lower = np.maximum(mean_acc - std_y, 0)
-    ax.fill_between(mean_x, y_lower, y_upper, color='b', alpha=0.1,
-                    label="$\pm$ 1 std. dev.")
-
-    ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 0.6])
-    ax.legend(loc="upper left")
-    ax.set_xlabel('Percentile')
-    ax.set_ylabel('Error Rate')
-    ax.set_title(f'{dataname} - Predictiveness Curves (PC)')
-    plt.tight_layout()
-    plt.savefig(path_output, dpi=300)
 
 
 def run_pipeline(dataset, cv_train, cv_test, Classifier, clf_params,

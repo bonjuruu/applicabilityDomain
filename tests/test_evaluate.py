@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 import pytest
-from adad.evaluate import (cumulative_accuracy, permutation_auc, plot_roc,
+from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            predictiveness_curves, roc_ad,
                            sensitivity_specificity)
 from adad.utils import set_seed
@@ -148,23 +148,6 @@ class TestEvaluate:
         assert fpr.shape == tpr.shape
         np.testing.assert_almost_equal(fpr, [0., 0., 0., 0.5, 0.5, 1.])
         np.testing.assert_array_almost_equal(tpr, [0., 0.25, 0.5, 0.5, 1., 1.])
-
-    def test_plot_roc(self, fprs_tprs):
-        # Checks if a roc graph is made with an (m, n) matrix under the correct path location
-        fprs, tprs = fprs_tprs
-        legend = [f'Model{i}' for i in range(len(fprs))]
-        path_roc = os.path.join(PATH_TEST, 'test_roc.pdf')
-        plot_roc(fprs, tprs, legend=legend, path=path_roc, title="Test ROC")
-        assert os.path.exists(path_roc)
-
-        # Remove generated file
-        os.remove(path_roc)
-
-        # Testing on ploting single model
-        plot_roc(fprs[:1], tprs[:1], legend=legend[:1],
-                 path=path_roc, title="Test ROC")
-        assert os.path.exists(path_roc)
-        os.remove(path_roc)
 
     def test_sensitivity_specificity(self, input1, input2, input3):
         # All positive case
