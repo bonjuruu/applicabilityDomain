@@ -18,7 +18,7 @@ from adad.evaluate import (cumulative_accuracy, permutation_auc,
                            sensitivity_specificity)
 from adad.plot import plot_ca, plot_pc, plot_roc
 from adad.probability import ProbabilityClassifier
-from adad.torch_utils import NNClassifier
+from adad.torch_utils import NeuralNet, NNClassifier
 from adad.utils import create_dir, set_seed, time2str, to_json
 
 AD_NAMES = ['gamma', 'kappa', 'delta', 'boundingbox', 'prob']
