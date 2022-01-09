@@ -138,6 +138,7 @@ class Magnet(AppDomainBase):
                 logger.info(f'Loss after {e:d} epochs: {loss_tr:.3f}')
         time_elapsed = time.perf_counter() - time_start
         logger.info(f'Total training time: {time2str(time_elapsed)}')
+        return self
 
     def measure(self, X):
         """Encode X using all autoencoders"""

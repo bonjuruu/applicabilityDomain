@@ -44,6 +44,7 @@ class SklearnFeatureSqueezing(AppDomainBase):
             clf.fit(Xs[i], y)
         time_elapsed = time.perf_counter() - time_start
         logger.info(f'Total training time: {time2str(time_elapsed)}')
+        return self
 
     def measure(self, X, Xs_alt):
         """Check AD on X.

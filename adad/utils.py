@@ -84,7 +84,7 @@ def to_json(data_dict, path):
             return obj.__str__()
 
     with open(path, 'w') as file:
-        logger.info('Save to:', path)
+        logger.info(f'Save to: {path}')
         json.dump(data_dict, file, default=converter)
 
 
@@ -101,13 +101,13 @@ def open_json(path):
 def create_dir(path):
     """Create directory if the input path is not found."""
     if not os.path.exists(path):
-        logger.info('Creating directory:', path)
+        logger.info(f'Creating directory: {path}')
         os.makedirs(path)
 
 
 def open_csv(path_data, label_name='y'):
     """Read data from a CSV file, return X, y and column names."""
-    logger.info('Load from:', path_data)
+    logger.info(f'Load from: {path_data}')
     df_data = pd.read_csv(path_data)
     y = df_data[label_name].to_numpy()
     df_data = df_data.drop([label_name], axis=1)
@@ -118,7 +118,7 @@ def open_csv(path_data, label_name='y'):
 
 def to_csv(X, y, cols, path_data):
     """Save data into a CSV file."""
-    logger.info('Save to:', path_data)
+    logger.info(f'Save to: {path_data}')
     df = pd.DataFrame(X, columns=cols, dtype=np.float32)
     labels = len(np.unique(y))
     assert labels == 2, f'Expecting 2 classes, got {labels}'
