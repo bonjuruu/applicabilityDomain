@@ -1,5 +1,5 @@
 import torch
-import torch.nn.functional as F
+from torch.utils.data import DataLoader, TensorDataset
 
 
 class EarlyStopping:
@@ -94,3 +94,45 @@ def train_model(model, dataloader, optimizer, loss_fn, device, max_epochs):
             # print('Stop at: {}'.format(epoch))
             break
     return acc_train, loss_train
+
+
+def predict(X, model, device, batch_size=128):
+    n = len(X)
+    dataset = TensorDataset(torch.from_numpy(X).type(torch.float32))
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    pred = torch.empty(n, dtype=torch.long)
+
+    start = 0
+    model.eval()
+    with torch.no_grad():
+        for [x] in dataloader:
+            x = x.to(device)
+            output = model(x)
+            end = start + x.size(0)
+            pred[start: end] = output.argmax(1).detach().cpu()
+            start = end
+
+    return pred.numpy()
+
+
+def predict_proba(X, model, device, batch_size=128):
+    n = len(X)
+    dataset = TensorDataset(torch.from_numpy(X).type(torch.float32))
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    it = iter(dataloader)
+    [x] = it.next()
+    output = model(x.to(device))
+    n_output = output.size(-1)
+    pred = torch.empty((n, n_output), dtype=torch.float32)
+
+    start = 0
+    model.eval()
+    with torch.no_grad():
+        for [x] in dataloader:
+            x = x.to(device)
+            output = torch.softmax(model(x), 1)
+            end = start + x.size(0)
+            pred[start: end] = output.detach().cpu()
+            start = end
+
+    return pred.numpy()
