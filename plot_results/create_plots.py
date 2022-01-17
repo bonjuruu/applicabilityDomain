@@ -241,7 +241,7 @@ def run_dataset_graphs():
             else:
                 liver_dict[method] = {"CumulativeAccuracy":df_ca,"PredictivenessCurves": df_pc, "ROC": df_roc}
     
-    dataset_path = os.path.join(graph_path, "plot")
+    dataset_path = os.path.join(graph_path, "dataset")
     create_dir(dataset_path)
     
     create_ca_graph(ames_dict, dataset_path, 'Ames')
