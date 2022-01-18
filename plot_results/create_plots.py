@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import RocCurveDisplay, auc
 
 #Global variables
-PATH_ROOT = os.getcwd()
+PATH_ROOT = Path(os.getcwd())
 CLASSIFIERS = ['KNeighborsClassifier', 'NNClassifier', 'RandomForestClassifier', 'SVC']
-AD = ['DAIndexDelta', 'DAIndexGamma', 'DAIndexKappa', 'Magnet', 'PCABoundingBox', 'ProbabilityClassifier', 'SklearnFeatureSqueezing', 'SklearnRegionBasedClassifier']
+AD = ['DAIndexDelta', 'DAIndexGamma', 'DAIndexKappa', 'PCABoundingBox', 'ProbabilityClassifier', 'Magnet','SklearnFeatureSqueezing', 'SklearnRegionBasedClassifier']
+AL = ['Magnet','SklearnFeatureSqueezing', 'SklearnRegionBasedClassifier']
 DATASETS = ['Ames', 'BBBP', 'Cancer', 'CYP1A2', 'hERG', 'HIV', 'Liver']
 GRAPH_FILE = ['CumulativeAccuracy.csv', 'PredictivenessCurves.csv', 'roc.csv']
-COLOURS = ['#332288', '#88CCEE', '#44AA99', '#117733', '#DDCC77', '#CC6677', '#882255', '#AA4499']
+COLOURS = ['#882E72', '#1965B0', '#7BAFDE', '#4EB265', '#CAE0AB', '#F7F056', '#EE8026', '#DC050C']
 
 parent_directory = os.path.join(PATH_ROOT, 'results')
 save_directory = os.path.join(PATH_ROOT, 'plot_results')
@@ -95,7 +96,14 @@ def create_ca_graph(a_dict, path, name, fontsize=12, figsize=(8,8)):
         for dataset in df_ca.columns:
             y.append(df_ca[dataset].to_numpy())
         mean_y = np.mean(y, axis=0)
-        ax.plot(mean_x, mean_y, alpha=1, color=COLOURS[AD.index(ad)], lw=2.5, label=ad)
+        
+        #Linestyle
+        if ad in AL:
+            ls = '--'
+        else:
+            ls = '-'
+            
+        ax.plot(mean_x, mean_y, alpha=1, color=COLOURS[AD.index(ad)], ls=ls, lw=2.5, label=ad)
 
     ax.set(xlim=[-0.01, 1.01], ylim=[0.5, 1.01])
     ax.legend(loc="lower right")
@@ -118,7 +126,14 @@ def create_pc_graph(a_dict, path, name, fontsize=12, figsize=(8,8)):
         for dataset in df_pc.columns:
             y.append(df_pc[dataset].to_numpy())
         mean_y = np.mean(y, axis=0)
-        ax.plot(mean_x, mean_y, alpha=1, color=COLOURS[AD.index(ad)], lw=2.5, label=ad)
+        
+        #Linestyle
+        if ad in AL:
+            ls = '--'
+        else:
+            ls = '-'
+            
+        ax.plot(mean_x, mean_y, alpha=1, color=COLOURS[AD.index(ad)], lw=2.5, ls=ls, label=ad)
 
     ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 0.6])
     ax.legend(loc="upper left")
@@ -130,21 +145,35 @@ def create_pc_graph(a_dict, path, name, fontsize=12, figsize=(8,8)):
     
 def create_roc_graph(a_dict, path, name, fontsize=12, figsize=(8,8)):
     """Plot ROC Curve"""
+    roc_dict = {'ad':[], 'mean_tpr':[], 'mean_auc':[], 'colour': []}
+
     plt.rcParams["font.size"] = fontsize
     fig, ax = plt.subplots(figsize=figsize)
-    tprs = []
     mean_fpr = np.linspace(0, 1, 100)
     
-    #Create line for each applicability domain
     for ad in AD:
+        roc_dict['ad'].append(ad)
         df_roc = a_dict[ad]['ROC']
         y = []
         for dataset in df_roc.columns:
             y.append(df_roc[dataset].to_numpy())
         mean_tpr = np.mean(y, axis=0)
-        mean_auc = auc(mean_fpr, mean_tpr)
-        display = RocCurveDisplay(fpr=mean_fpr, tpr=mean_tpr, roc_auc=mean_auc)
-        display.plot(ax=ax, alpha=1, lw=2.5, color=COLOURS[AD.index(ad)], label=f"{ad} (AUC={mean_auc:.2f})")
+        roc_dict['mean_tpr'].append(mean_tpr)
+        roc_dict['mean_auc'].append(auc(mean_fpr, mean_tpr))
+        roc_dict['colour'].append(COLOURS[AD.index(ad)])
+    
+    df_graph = pd.DataFrame(data=roc_dict)
+    df_graph = df_graph.sort_values(by='mean_auc').reset_index(drop=True)
+    
+    for i in range(len(df_graph)):
+        ad = df_graph.loc[i, 'ad']
+        if ad in AL:
+            ls = '--'
+        else:
+            ls = '-'
+            
+        display = RocCurveDisplay(fpr=mean_fpr, tpr=df_graph.loc[i, 'mean_tpr'], roc_auc=df_graph.loc[i, 'mean_auc'])
+        display.plot(ax=ax, alpha=1, lw=2.5, color=df_graph.loc[i,'colour'], ls=ls, label=f"{ad} (AUC={df_graph.loc[i, 'mean_auc']:.2f})")
 
     ax.set(xlim=[-0.01, 1.01], ylim=[-0.01, 1.01])
     ax.legend(loc="lower right")
