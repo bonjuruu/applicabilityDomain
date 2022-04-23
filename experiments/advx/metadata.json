@@ -22,5 +22,10 @@
     "ringnorm_scale.csv",
     "texture_scale.csv",
     "yeast_scale.csv"
+  ],
+  "attacks": [
+    "apgd",
+    "cw2",
+    "fgsm"
   ]
 }

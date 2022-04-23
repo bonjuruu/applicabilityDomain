@@ -7,14 +7,15 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, TensorDataset
+
 from adad.models.numeric import NumericModel
 from adad.models.torch_train import evaluate, train_model
 from adad.utils import create_dir, open_csv, open_json, time2str, to_csv
-from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
 
 PATH_ROOT = Path(os.getcwd()).absolute()
 path_current = os.path.join(PATH_ROOT, 'experiments', 'advx')
@@ -24,8 +25,8 @@ assert len(METADATA['datasets']) == len(METADATA['filenames']), 'Found an error 
 PATH_DATA = os.path.join(PATH_ROOT, 'data', 'numeric', 'preprocessed')
 
 
-def split_n_train(dataname, data_filename, path_output, testsize, path_params, restart):
-    path_data = os.path.join(PATH_DATA, data_filename)
+def split_n_train(dataname, data_filename, filepath, path_output, testsize, path_params, restart):
+    path_data = os.path.join(filepath, data_filename)
     X, y, cols = open_csv(path_data, label_name='Class')
 
     # Step 1: Split data
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True, choices=METADATA['datasets'])
-    parser.add_argument('--filepath', type=str, default=PATH_DATA)
+    parser.add_argument('-f', '--filepath', type=str, default=PATH_DATA)
     parser.add_argument('-o', '--output', type=str, default='results/numeric')
     parser.add_argument('--testsize', type=float, default=0.2)
     parser.add_argument('-p', '--params', type=str, default='./experiments/advx/params.json')
@@ -129,4 +130,4 @@ if __name__ == '__main__':
     print('Dataset:', dataname)
     print('ROOT directory:', PATH_ROOT)
     print('Save to:', path_output)
-    split_n_train(dataname, data_filename, path_output, testsize, path_params, restart)
+    split_n_train(dataname, data_filename, filepath, path_output, testsize, path_params, restart)
