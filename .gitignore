@@ -164,3 +164,4 @@ results/
 demo/*/*.pdf
 demo/*/*.json
 demo/*/*.csv
+.vscode/
