@@ -10,7 +10,7 @@ TODO: Add the list of required packages
 from setuptools import setup, find_packages
 
 setup(
-    name='ADAD',
+    name='adad',
     description='Applicability Domain & Adversarial Defences',
     packages=find_packages(),
     version='0.0.1',
