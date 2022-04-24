@@ -11,10 +11,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
 
 from adad.models.numeric import NumericModel
-from adad.models.torch_train import evaluate, train_model
+from adad.torch_utils import evaluate, train_model, numpy_2_dataloader
 from adad.utils import create_dir, open_csv, open_json, time2str, to_csv
 
 PATH_ROOT = Path(os.getcwd()).absolute()
@@ -64,12 +63,8 @@ def split_n_train(dataname, data_filename, filepath, path_output, testsize, path
     momentum = params['momentum']
     print('# of neurons in hidden layer:', hidden_layer)
 
-    dataset_train = TensorDataset(torch.from_numpy(X_train).type(torch.float32),
-                                  torch.from_numpy(y_train).type(torch.int64))
-    dataloader_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
-    dataset_test = TensorDataset(torch.from_numpy(X_test).type(torch.float32),
-                                 torch.from_numpy(y_test).type(torch.int64))
-    dataloader_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
+    dataloader_train = numpy_2_dataloader(X_train, y_train, batch_size=batch_size, shuffle=True)
+    dataloader_test = numpy_2_dataloader(X_test, y_test, batch_size=batch_size, shuffle=False)
 
     model = NumericModel(
         n_features=n_features,

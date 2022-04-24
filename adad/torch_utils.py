@@ -8,6 +8,15 @@ from torch.utils.data import DataLoader, TensorDataset
 from .utils import create_dir, open_json, to_json
 
 
+def numpy_2_dataloader(X, y, batch_size=128, shuffle=False):
+    """Convert data from numpy array to PyTorch DataLoader"""
+    assert X.shape[0] == y.shape[0], 'X and y must have the same length.'
+
+    dataset = TensorDataset(torch.from_numpy(X).type(torch.float32),
+                            torch.from_numpy(y).type(torch.int64))
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+
 class EarlyStopping:
     """
     Early stopping to stop the training when the loss does not improve after
