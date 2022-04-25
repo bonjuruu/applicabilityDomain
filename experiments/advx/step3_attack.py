@@ -136,7 +136,9 @@ def train_attacks(dataname, path_output, path_params, attack, epsilons):
 
 if __name__ == '__main__':
     """Example:
-    python ./experiments/advx/step3_attack.py -d abalone -a fgsm
+    python ./experiments/advx/step3_attack.py -d abalone -a fgsm -e 0.3 1.0
+    python ./experiments/advx/step3_attack.py -d abalone -a cw2 -e 10
+    python ./experiments/advx/step3_attack.py -d abalone -a apgd -e 0.3 1.0
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True, choices=METADATA['datasets'])

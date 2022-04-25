@@ -1,10 +1,11 @@
 """
 Perform adversarial attacks.
 """
+from pyexpat import model
 import numpy as np
 
 from art.attacks.evasion import (AutoProjectedGradientDescent,
-                                 FastGradientMethod)
+                                 FastGradientMethod, CarliniL2Method)
 from art.estimators.classification import PyTorchClassifier
 
 from adad.models.attacks.carlini import CarliniWagnerAttackL2
@@ -31,6 +32,7 @@ class AdvxAttack:
             clip_values=clip_values,
             device_type=device
         )
+        self.clip_values = clip_values
         self.n_classes = n_classes
         self.name = att_name
         self.batch_size = batch_size
@@ -57,9 +59,10 @@ class AdvxAttack:
                 model=self.clf._model._model,
                 n_classes=self.n_classes,
                 confidence=epsilon,
+                clip_values=self.clip_values,
+                binary_search_steps=5,
+                max_iter=100,
                 check_prob=True,
-                batch_size=self.batch_size,
-                targeted=False,
                 verbose=False)
         adv = attack.generate(x=X)
         return adv
