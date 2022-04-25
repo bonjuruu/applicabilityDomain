@@ -9,11 +9,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
-from adad.models.numeric import NumericModel
-from adad.torch_utils import evaluate, train_model, numpy_2_dataloader
+from adad.torch_utils import NNClassifier
 from adad.utils import create_dir, open_csv, open_json, time2str, to_csv
 
 PATH_ROOT = Path(os.getcwd()).absolute()
@@ -63,44 +61,39 @@ def split_n_train(dataname, data_filename, filepath, path_output, testsize, path
     momentum = params['momentum']
     print('# of neurons in hidden layer:', hidden_layer)
 
-    dataloader_train = numpy_2_dataloader(X_train, y_train, batch_size=batch_size, shuffle=True)
-    dataloader_test = numpy_2_dataloader(X_test, y_test, batch_size=batch_size, shuffle=False)
+    clf = NNClassifier(
+        input_dim=n_features,
+        hidden_dim=hidden_layer,
+        output_dim=n_classes,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        lr=lr,
+        momentum=momentum,
+        weight_decay=0.,
+        device=device)
 
-    model = NumericModel(
-        n_features=n_features,
-        n_hidden=hidden_layer,
-        n_classes=n_classes,
-    ).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
-    loss_fn = nn.CrossEntropyLoss()
-
-    path_model = os.path.join(path_output, 'clf')
-    create_dir(path_model)
-    path_model = os.path.join(path_model, f'{dataname}.torch')
-
-    if os.path.exists(path_model) and not restart:
-        model.load_state_dict(torch.load(path_model, map_location=device))
-    else:
-        # Train the clean model
-        time_start = time.perf_counter()
-        train_model(model, dataloader_train, optimizer,
-                    loss_fn, device, max_epochs)
-        time_elapsed = time.perf_counter() - time_start
-        print('Time taken: {}'.format(time2str(time_elapsed)))
-        # Save model
-        torch.save(model.state_dict(), path_model)
+    # Train the model
+    path_model = os.path.join(path_output, 'clf', dataname)
+    time_start = time.perf_counter()
+    clf.fit(X_train, y_train)
+    time_elapsed = time.perf_counter() - time_start
+    print('Time taken: {}'.format(time2str(time_elapsed)))
+    # Save model
+    # torch.save(model.state_dict(), path_model)
+    clf.save(path_model)
 
     ############################################################################
     # Step 3: Evaluate results
-    acc_train, loss_train = evaluate(dataloader_train, model, loss_fn, device)
-    acc_test, loss_test = evaluate(dataloader_test, model, loss_fn, device)
-    print('Train acc: {:.2f} loss: {:.3f}'.format(acc_train * 100, loss_train))
-    print(' Test acc: {:.2f} loss: {:.3f}'.format(acc_test * 100, loss_test))
+    acc_train = clf.score(X_train, y_train)
+    acc_test = clf.score(X_test, y_test)
+    print('Train acc: {:.2f}%'.format(acc_train * 100))
+    print(' Test acc: {:.2f}%'.format(acc_test * 100))
 
 
 if __name__ == '__main__':
     """Example:
     python ./experiments/advx/step2_train_clf.py -d abalone
+    python ./experiments/advx/step2_train_clf.py -d abalone -r 0
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True, choices=METADATA['datasets'])
@@ -111,6 +104,8 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--restart', type=int, default=1)
     parser.add_argument('-i', '--index', type=int, default=1)
     args = parser.parse_args()
+    print('Received args:', args)
+
     dataname = args.data
     filepath = str(Path(args.filepath).absolute())
     path_output = str(Path(args.output).absolute())

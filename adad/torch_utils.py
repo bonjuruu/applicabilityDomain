@@ -153,11 +153,34 @@ def predict_proba(X, model, device, batch_size=128):
     return pred.numpy()
 
 
+def get_correct_examples(model, X, Y, device='cpu', batch_size=128):
+    """Removes incorrect predictions."""
+    model.eval()
+    corrects = torch.zeros(len(X), dtype=torch.bool)
+    dataloader = numpy_2_dataloader(X, Y, batch_size=batch_size, shuffle=False)
+    start = 0
+    with torch.no_grad():
+        for x, y in dataloader:
+            n = x.size(0)
+            end = start + n
+            x = x.to(device)
+            y = y.to(device)
+            outputs = model(x)
+            pred = outputs.max(1, keepdim=True)[1]
+            corrects[start:end] = y.eq(pred.view_as(y)).cpu()
+            start += n
+    indices = torch.squeeze(torch.nonzero(corrects), 1).numpy()
+    return (X[indices], Y[indices])
+
+
 class NeuralNet(nn.Module):
     """A simple fullly-connected neural network with 1 hidden-layer"""
 
     def __init__(self, input_dim, hidden_dim=512, output_dim=2):
         super(NeuralNet, self).__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
 
         self.layer1 = nn.Linear(input_dim, hidden_dim)
         self.layer2 = nn.Linear(hidden_dim, hidden_dim)
@@ -178,6 +201,9 @@ class NNClassifier:
                  batch_size=128,
                  max_epochs=300,
                  lr=1e-3,
+                 momentum=0.9,
+                 weight_decay=1e-4,
+                 Model=NeuralNet,
                  device='cuda'):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -185,11 +211,15 @@ class NNClassifier:
         self.batch_size = batch_size
         self.max_epochs = max_epochs
         self.lr = lr
+        self.momentum = momentum
+        self.weight_decay = weight_decay
+        self.Model = Model
         self.device = torch.device(device)
 
-        self.clf = NeuralNet(input_dim, hidden_dim, output_dim).to(self.device)
+        self.clf = Model(input_dim, hidden_dim, output_dim).to(self.device)
         self.loss_fn = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.clf.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+        self.optimizer = torch.optim.SGD(
+            self.clf.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
 
     def fit(self, X, y):
         dataset = TensorDataset(
@@ -225,6 +255,8 @@ class NNClassifier:
             'batch_size': self.batch_size,
             'max_epochs': self.max_epochs,
             'lr': self.lr,
+            'momentum': self.momentum,
+            'weight_decay': self.weight_decay,
             'device': str(self.device),
         }
         to_json(params, os.path.join(path, 'NNClassifier.json'))
@@ -238,6 +270,12 @@ class NNClassifier:
         self.max_epochs = params['max_epochs']
         self.lr = params['lr']
         self.device = torch.device(params['device'])
+
+        self.clf = self.Model(
+            self.input_dim,
+            self.hidden_dim,
+            self.output_dim
+        ).to(self.device)
         self.clf.load_state_dict(
             torch.load(
                 os.path.join(path, 'NeuralNet.torch'),

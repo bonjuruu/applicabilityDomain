@@ -23,9 +23,21 @@
     "texture_scale.csv",
     "yeast_scale.csv"
   ],
-  "attacks": [
-    "apgd",
-    "cw2",
-    "fgsm"
-  ]
+  "attacks": ["apgd", "cw2", "fgsm"],
+  "ad": ["gamma", "kappa", "delta", "boundingbox", "prob"],
+  "adParams": {
+    "gamma": {
+      "dist_metric": "manhattan"
+    },
+    "kappa": {
+      "dist_metric": "manhattan"
+    },
+    "delta": {
+      "dist_metric": "manhattan"
+    },
+    "boundingbox": {
+      "n_components": 5
+    },
+    "prob": {}
+  }
 }
