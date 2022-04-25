@@ -123,7 +123,7 @@ def run_ad(dataname, path_output, att_name, ad_name):
         tprs.append(df_roc[['tpr']].to_numpy())
         epsilon = Path(file_roc).stem.split('_')[-1]
         legends.append(epsilon)
-    path_plot = os.path.join(path_roc, f'roc_{dataname}_{att_name}.pdf')
+    path_plot = os.path.join(path_roc, f'roc_{dataname}_{att_name}_{ad_name}.pdf')
     plot_roc_list(
         fprs,
         tprs,
@@ -138,6 +138,10 @@ def run_ad(dataname, path_output, att_name, ad_name):
 if __name__ == '__main__':
     """Examples:
     python ./experiments/advx/step4_defence.py -d abalone -o "./results/numeric/run_1/" -a fgsm --ad gamma
+    python ./experiments/advx/step4_defence.py -d australian -o "./results/numeric/run_1/" -a apgd --ad kappa
+    python ./experiments/advx/step4_defence.py -d banknote -o "./results/numeric/run_1/" -a cw2 --ad delta
+    python ./experiments/advx/step4_defence.py -d breastcancer -o "./results/numeric/run_1/" -a fgsm --ad boundingbox
+    python ./experiments/advx/step4_defence.py -d htru2 -o "./results/numeric/run_1/" -a apgd --ad prob
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True, choices=METADATA['datasets'])

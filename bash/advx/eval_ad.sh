@@ -12,7 +12,7 @@ for IDX in "${INDICES[@]}"; do
             for AD in "${ADS[@]}"; do
                 echo "-------------------------------------------------------------"
                 echo "[$IDX] Running on Data: $DATA Attack: $ATT Defence: $AD..."
-                python ./experiments/advx/step4_defence.py -d abalone -o "./results/numeric/run_1/" -a fgsm --ad gamma
+                python ./experiments/advx/step4_defence.py -d $DATA -o "./results/numeric/run_$IDX/" -a $ATT --ad $AD
             done
         done
     done
