@@ -15,9 +15,9 @@ from adad.torch_utils import NNClassifier
 from adad.utils import create_dir, open_csv, open_json, time2str, to_csv
 
 PATH_ROOT = Path(os.getcwd()).absolute()
-path_current = os.path.join(PATH_ROOT, 'experiments', 'advx')
-path_json = os.path.join(path_current, 'metadata.json')
-METADATA = open_json(path_json)
+PATH_CURRENT = os.path.join(PATH_ROOT, 'experiments', 'advx')
+PATH_JSON = os.path.join(PATH_CURRENT, 'metadata.json')
+METADATA = open_json(PATH_JSON)
 assert len(METADATA['datasets']) == len(METADATA['filenames']), 'Found an error in metadata.json file.'
 PATH_DATA = os.path.join(PATH_ROOT, 'data', 'numeric', 'preprocessed')
 

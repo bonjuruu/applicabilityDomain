@@ -15,11 +15,10 @@ from adad.torch_utils import NNClassifier, get_correct_examples
 from adad.utils import create_dir, open_csv, open_json
 
 PATH_ROOT = Path(os.getcwd()).absolute()
-path_current = os.path.join(PATH_ROOT, 'experiments', 'advx')
-path_json = os.path.join(path_current, 'metadata.json')
-METADATA = open_json(path_json)
+PATH_CURRENT = os.path.join(PATH_ROOT, 'experiments', 'advx')
+PATH_JSON = os.path.join(PATH_CURRENT, 'metadata.json')
+METADATA = open_json(PATH_JSON)
 assert len(METADATA['datasets']) == len(METADATA['filenames']), 'Found an error in metadata.json file.'
-PATH_DATA = os.path.join(PATH_ROOT, 'data', 'numeric', 'preprocessed')
 
 
 def get_ad(adname):
@@ -108,11 +107,11 @@ def run_ad(dataname, path_output, att_name, ad_name):
             'fpr': fpr,
             'tpr': tpr,
         })
-        df_roc.to_csv(os.path.join(path_roc, f'roc_{filename}.csv'), index=False)
+        df_roc.to_csv(os.path.join(path_roc, f'roc_{ad_name}_{filename}.csv'), index=False)
 
     # Step 6: Plot result
     # NOTE: This result is only for single run.
-    files_roc = sorted(glob(os.path.join(path_roc, f'roc_{dataname}_{att_name}*.csv')))
+    files_roc = sorted(glob(os.path.join(path_roc, f'roc_{ad_name}_{dataname}_{att_name}_*.csv')))
     print(f'Fround {len(files_roc)} ROC files')
     fprs = []
     tprs = []
@@ -123,7 +122,7 @@ def run_ad(dataname, path_output, att_name, ad_name):
         tprs.append(df_roc[['tpr']].to_numpy())
         epsilon = Path(file_roc).stem.split('_')[-1]
         legends.append(epsilon)
-    path_plot = os.path.join(path_roc, f'roc_{dataname}_{att_name}_{ad_name}.pdf')
+    path_plot = os.path.join(path_roc, f'roc_{ad_name}_{dataname}_{att_name}.pdf')
     plot_roc_list(
         fprs,
         tprs,

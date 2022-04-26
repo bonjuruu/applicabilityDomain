@@ -17,7 +17,6 @@ PATH_ROOT = Path(os.getcwd()).absolute()
 PATH_CURRENT = os.path.join(PATH_ROOT, 'experiments', 'advx')
 PATH_JSON = os.path.join(PATH_CURRENT, 'metadata.json')
 METADATA = open_json(PATH_JSON)
-PATH_DATA = os.path.join(PATH_ROOT, 'data', 'numeric', 'preprocessed')
 
 assert len(METADATA['datasets']) == len(METADATA['filenames']), 'Found an error in metadata.json file.'
 

@@ -4,24 +4,20 @@
     "australian",
     "banknote",
     "breastcancer",
-    "cmc",
     "htru2",
     "phoneme",
     "ringnorm",
-    "texture",
-    "yeast"
+    "texture"
   ],
   "filenames": [
     "abalone_scale.csv",
     "australian_scale.csv",
     "banknote_scale.csv",
     "breastcancer_scale.csv",
-    "cmc_scale.csv",
     "htru2_scale.csv",
     "phoneme_scale.csv",
     "ringnorm_scale.csv",
-    "texture_scale.csv",
-    "yeast_scale.csv"
+    "texture_scale.csv"
   ],
   "attacks": ["apgd", "cw2", "fgsm"],
   "ad": ["gamma", "kappa", "delta", "boundingbox", "prob"],
