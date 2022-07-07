@@ -62,7 +62,7 @@ class AdvxAttack:
                 clip_values=self.clip_values,
                 binary_search_steps=5,
                 max_iter=100,
-                check_prob=True,
+                check_prob=False,
                 verbose=False)
         adv = attack.generate(x=X)
         return adv
