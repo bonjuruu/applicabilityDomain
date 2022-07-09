@@ -165,3 +165,6 @@ demo/*/*.pdf
 demo/*/*.json
 demo/*/*.csv
 .vscode/
+
+# Do not include temp files
+.~lock*
