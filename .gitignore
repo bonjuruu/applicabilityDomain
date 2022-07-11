@@ -170,3 +170,5 @@ demo/*/*.csv
 
 # Do not include PyCharm config
 .idea/
+# Do not include temp files
+.~lock*
