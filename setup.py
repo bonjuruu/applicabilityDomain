@@ -14,5 +14,5 @@ setup(
     description='Applicability Domain & Adversarial Defences',
     packages=find_packages(),
     version='0.0.1',
-    python_requires='>=3.6',
+    python_requires='>=3.8',
 )

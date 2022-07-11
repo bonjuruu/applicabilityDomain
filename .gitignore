@@ -164,4 +164,9 @@ results/
 demo/*/*.pdf
 demo/*/*.json
 demo/*/*.csv
+
+# Do note include VS code config
 .vscode/
+
+# Do not include PyCharm config
+.idea/
